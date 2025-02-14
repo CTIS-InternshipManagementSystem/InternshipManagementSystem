@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dashboardPage.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -12,35 +13,88 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _deadlineController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _bilkentIdController = TextEditingController();
 
   // Dropdown listeleri
   final List<String> _years = ['2023', '2024', '2025'];
-  final List<String> _semesters = ['Fall', 'Spring', 'Summer'];
-  final List<String> _courses = ['Course A', 'Course B', 'Course C'];
-  final List<String> _roles = ['Student', 'Instructor', 'Admin'];
+  final List<String> _semesters = ['Fall', 'Spring'];
+  final List<String> _courses = ['CTIS310', 'CTIS290'];
+  final List<String> _roles = ['Student', 'Admin'];
+  final List<String> _changeDeadlineCourses = ['CTIS 290', 'CTIS 310'];
+  final List<String> _ctis290Options = ['Reports about an internship'];
+  final List<String> _ctis310Options = [
+    'Follow Up1',
+    'Follow Up2',
+    'Follow Up3',
+    'Follow Up4',
+    'Follow Up5',
+    'Reports about an internship'
+  ];
+  final List<String> _supervisors = ['Dr. Smith', 'Dr. Brown', 'Dr. Johnson'];
 
   String? _selectedYear;
   String? _selectedSemester;
   String? _selectedCourse;
   String? _selectedRole;
+  String? _selectedUserSemester;
+  String? _selectedChangeDeadlineCourse;
+  String? _selectedOption;
+  String? _selectedSupervisor;
+
+  // Sample data for registered semesters
+  final List<Map<String, String>> _registeredSemesters = [
+    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS310', 'role': 'Student'},
+    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Student'},
+    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Admin'},
+  ];
+
+  Future<void> _selectDeadlineDate(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2101),
+    );
+    if (pickedDate != null) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
+      if (pickedTime != null) {
+        final DateTime fullDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        setState(() {
+          _deadlineController.text = fullDateTime.toString();
+        });
+      } else {
+        // Optional: if no time is selected, just use the picked date.
+        setState(() {
+          _deadlineController.text = pickedDate.toString();
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('JMS'),
+        title: const Text('CTIS IMS '),
+        backgroundColor: Colors.orange,
         actions: [
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => DashboardPage(registeredSemesters: _registeredSemesters)),
+              );
+            },
             child: const Text('Dashboard', style: TextStyle(color: Colors.white)),
-          ),
-          TextButton(
-            onPressed: () {},
-            child: const Text('Announcements', style: TextStyle(color: Colors.white)),
-          ),
-          TextButton(
-            onPressed: () {},
-            child: const Text('FAQ', style: TextStyle(color: Colors.white)),
           ),
           TextButton(
             onPressed: () {},
@@ -97,20 +151,75 @@ class _HomePageState extends State<HomePage> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
-                    const Text('Change first-submission deadline (in days):'),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _selectedChangeDeadlineCourse,
+                      decoration: const InputDecoration(
+                        labelText: 'Course',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _changeDeadlineCourses.map((course) {
+                        return DropdownMenuItem(
+                          value: course,
+                          child: Text(course),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedChangeDeadlineCourse = value;
+                          _selectedOption = null; // Reset selected option
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    if (_selectedChangeDeadlineCourse != null)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select Option:',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          ...(_selectedChangeDeadlineCourse == 'CTIS 290'
+                              ? _ctis290Options
+                              : _ctis310Options)
+                              .map((option) => RadioListTile<String>(
+                            title: Text(option),
+                            value: option,
+                            groupValue: _selectedOption,
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedOption = value;
+                              });
+                            },
+                          ))
+                              .toList(),
+                        ],
+                      ),
+                    const SizedBox(height: 16),
+                    const Text('Change first-submission deadline:'),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _deadlineController,
                       decoration: const InputDecoration(
-                        labelText: 'Deadline (days)',
+                        labelText: 'Deadline',
                         border: OutlineInputBorder(),
                       ),
-                      keyboardType: TextInputType.number,
+                      readOnly: true,
+                      onTap: () => _selectDeadlineDate(context),
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: () {
+                        if (_selectedOption == null || _deadlineController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please select an option and set a deadline')),
+                          );
+                          return;
+                        }
                         debugPrint('New deadline: ${_deadlineController.text}');
+                        debugPrint('Selected option: $_selectedOption');
                       },
                       child: const Text('Update'),
                     ),
@@ -131,14 +240,6 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       'Create Semester',
                       style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    // Choose File butonu
-                    ElevatedButton(
-                      onPressed: () {
-                        debugPrint('Choose file clicked');
-                      },
-                      child: const Text('Choose File'),
                     ),
                     const SizedBox(height: 16),
                     // Year Dropdown
@@ -250,6 +351,16 @@ class _HomePageState extends State<HomePage> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 16),
+                    // Bilkent ID
+                    TextField(
+                      controller: _bilkentIdController,
+                      decoration: const InputDecoration(
+                        labelText: 'Bilkent ID',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
                     // Role Dropdown
                     DropdownButtonFormField<String>(
                       isExpanded: true,
@@ -267,6 +378,51 @@ class _HomePageState extends State<HomePage> {
                       onChanged: (value) {
                         setState(() {
                           _selectedRole = value;
+                          _selectedSupervisor = null; // Reset selected supervisor
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Supervisor Dropdown (only for students)
+                    if (_selectedRole == 'Student') ...[
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: _selectedSupervisor,
+                        decoration: const InputDecoration(
+                          labelText: 'Supervisor',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _supervisors.map((supervisor) {
+                          return DropdownMenuItem(
+                            value: supervisor,
+                            child: Text(supervisor),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSupervisor = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    // Semester Dropdown
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _selectedUserSemester,
+                      decoration: const InputDecoration(
+                        labelText: 'Semester',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _semesters.map((semester) {
+                        return DropdownMenuItem(
+                          value: semester,
+                          child: Text(semester),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedUserSemester = value;
                         });
                       },
                     ),
@@ -275,7 +431,10 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () {
                         debugPrint('Name: ${_nameController.text}');
                         debugPrint('Mail: ${_emailController.text}');
+                        debugPrint('Bilkent ID: ${_bilkentIdController.text}');
                         debugPrint('Role: $_selectedRole');
+                        debugPrint('Supervisor: $_selectedSupervisor');
+                        debugPrint('Semester: $_selectedUserSemester');
                       },
                       child: const Text('Submit'),
                     ),
