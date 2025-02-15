@@ -1,4 +1,4 @@
-import 'package:ctisims/main.dart' as app;
+import 'main.dart' as app;
 
 Future<void> main() async {
   // ...existing web-specific setup if needed...

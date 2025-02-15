@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'homePage.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -32,6 +32,7 @@ class _LoginPageState extends State<LoginPage> {
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
+      return;
     } catch (e) {
       // Hata durumunda mesaj gösteriyoruz
       ScaffoldMessenger.of(context).showSnackBar(

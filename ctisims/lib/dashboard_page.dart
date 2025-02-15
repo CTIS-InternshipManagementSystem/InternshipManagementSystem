@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'submissionPage.dart';
-import 'assignedSubmissionsPage.dart';
-import 'exportPage.dart';
-import 'searchPage.dart';
+import 'submission_page.dart';
+import 'assigned_submissions_page.dart';
+import 'export_page.dart';
+import 'search_page.dart';
 
 class DashboardPage extends StatelessWidget {
   final List<Map<String, String>> registeredSemesters;
