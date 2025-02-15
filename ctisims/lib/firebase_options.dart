@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'firebase_keys.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -50,22 +51,22 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCD5cOs3kCAbaIib45c212uGzdwJtxVCeU',
-    appId: '1:933212537172:ios:5f8a3946ad5d790e9708c1',
-    messagingSenderId: '933212537172',
-    projectId: 'ctisims-5e282',
-    storageBucket: 'ctisims-5e282.firebasestorage.app',
-    iosBundleId: 'com.example.ctisims',
+    apiKey: firebaseIosApiKey,
+    appId: firebaseIosAppId,
+    messagingSenderId: firebaseIosMessagingSenderId,
+    projectId: firebaseIosProjectId,
+    storageBucket: firebaseIosStorageBucket,
+    iosBundleId: firebaseIosBundleId,
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBXZZKSXan-2kfovgfuJf1hinFjWhuH2Hc',
-    authDomain: 'ctisims-5e282.firebaseapp.com',
-    projectId: 'ctisims-5e282',
-    storageBucket: 'ctisims-5e282.firebasestorage.app',
-    messagingSenderId: '933212537172',
-    appId: '1:933212537172:web:ac330ebf644919859708c1',
-    measurementId: 'G-WQELMRF8NW',
+    apiKey: firebaseApiKey,
+    authDomain: firebaseAuthDomain,
+    projectId: firebaseProjectId,
+    storageBucket: firebaseStorageBucket,
+    messagingSenderId: firebaseMessagingSenderId,
+    appId: firebaseAppId,
+    measurementId: firebaseMeasurementId,
   );
 
 }
