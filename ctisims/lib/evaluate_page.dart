@@ -15,11 +15,10 @@ class _EvaluatePageState extends State<EvaluatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final String studentName = widget.submission['studentName'] ?? 'Demo student';
-    final String bilkentId = widget.submission['bilkentId'] ?? '1110002';
-    final String email = widget.submission['email'] ?? 'demo.student@bilkent.edu.tr';
-    final String course = widget.submission['course'] ?? 'CTIS310';
-    final String title = widget.submission['title'] ?? 'Submission';
+    final String? studentName = widget.submission['studentName'] ?? 'Demo student';
+    final String? bilkentId = widget.submission['bilkentId'] ?? '1110002';
+    final String? email = widget.submission['email'] ?? 'demo.student@bilkent.edu.tr';
+    final String? course = widget.submission['course'] ?? 'CTIS310';
 
     return Scaffold(
       appBar: AppBar(

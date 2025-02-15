@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'evaluatePage.dart';
+import 'evaluate_page.dart';
 
 class AssignedSubmissionsPage extends StatefulWidget {
   const AssignedSubmissionsPage({Key? key}) : super(key: key);

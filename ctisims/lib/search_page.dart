@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'submissionDetailPage.dart';
+import 'submission_detail_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({Key? key}) : super(key: key);
