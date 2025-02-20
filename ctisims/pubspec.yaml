@@ -37,6 +37,9 @@ dependencies:
   firebase_core: ^3.11.0
   firebase_analytics: ^11.4.2
   firebase_auth: ^5.4.2
+  sqflite: ^2.4.2
+  uuid: ^4.5.1
+  shared_preferences: ^2.5.2
 
 dev_dependencies:
   flutter_test:

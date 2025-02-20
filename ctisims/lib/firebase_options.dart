@@ -68,5 +68,4 @@ class DefaultFirebaseOptions {
     appId: firebaseAppId,
     measurementId: firebaseMeasurementId,
   );
-
 }
