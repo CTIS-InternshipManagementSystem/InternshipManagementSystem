@@ -104,7 +104,11 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const FlutterLogo(size: 80), // bilkent logo eklenecek.
+                        const SizedBox(height: 16),
+                        Image.asset(
+                          'assets/images/bilkent-logo.png',
+                            height: 80,
+                            ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _emailController,
