@@ -7,7 +7,8 @@ import 'search_page.dart';
 class DashboardPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters;
 
-  const DashboardPage({Key? key, required this.registeredSemesters}) : super(key: key);
+  const DashboardPage({Key? key, required this.registeredSemesters})
+      : super(key: key);
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -19,39 +20,217 @@ class _DashboardPageState extends State<DashboardPage> {
   String sortOption = "Year Ascending"; // default sort
   bool darkMode = false;
 
+  // Filter state variables with default values ("All" means no filtering)
+  String roleFilter = "All";
+  String yearFilter = "All";
+  String semesterFilter = "All";
+  String courseFilter = "All";
+
   @override
   void initState() {
     super.initState();
     filteredSemesters = List.from(widget.registeredSemesters);
   }
 
-  void updateSearch(String query) {
+  // Apply search and all filters
+  void _applyFilters() {
     setState(() {
-      searchQuery = query;
       filteredSemesters = widget.registeredSemesters.where((semester) {
-        final course = semester['course']?.toLowerCase() ?? "";
-        return course.contains(query.toLowerCase());
+        bool matches = true;
+        // Search filter (course name)
+        if (searchQuery.isNotEmpty) {
+          matches = matches &&
+              (semester['course']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+        }
+        // Role filter
+        if (roleFilter != "All") {
+          matches = matches && (semester['role'] == roleFilter);
+        }
+        // Year filter
+        if (yearFilter != "All") {
+          matches = matches && (semester['year'] == yearFilter);
+        }
+        // Semester filter
+        if (semesterFilter != "All") {
+          matches = matches && (semester['semester'] == semesterFilter);
+        }
+        // Course filter
+        if (courseFilter != "All") {
+          matches = matches && (semester['course'] == courseFilter);
+        }
+        return matches;
       }).toList();
+      _sortSemesters();
     });
   }
 
-  void sortSemesters() {
+  // Update search query and re-apply filters.
+  void updateSearch(String query) {
+    searchQuery = query;
+    _applyFilters();
+  }
+
+  // Updated sort method to include multiple sort options.
+  void _sortSemesters() {
     setState(() {
-      if (sortOption == "Year Ascending") {
-        filteredSemesters.sort((a, b) {
-          return (a['year'] ?? "").compareTo(b['year'] ?? "");
-        });
-      } else if (sortOption == "Year Descending") {
-        filteredSemesters.sort((a, b) {
-          return (b['year'] ?? "").compareTo(a['year'] ?? "");
-        });
+      switch (sortOption) {
+        case "Year Ascending":
+          filteredSemesters.sort(
+              (a, b) => (a['year'] ?? "").compareTo(b['year'] ?? ""));
+          break;
+        case "Year Descending":
+          filteredSemesters.sort(
+              (a, b) => (b['year'] ?? "").compareTo(a['year'] ?? ""));
+          break;
+        case "Semester Ascending":
+          filteredSemesters.sort((a, b) =>
+              (a['semester'] ?? "").compareTo(b['semester'] ?? ""));
+          break;
+        case "Semester Descending":
+          filteredSemesters.sort((a, b) =>
+              (b['semester'] ?? "").compareTo(a['semester'] ?? ""));
+          break;
+        case "Course Ascending":
+          filteredSemesters.sort(
+              (a, b) => (a['course'] ?? "").compareTo(b['course'] ?? ""));
+          break;
+        case "Course Descending":
+          filteredSemesters.sort(
+              (a, b) => (b['course'] ?? "").compareTo(a['course'] ?? ""));
+          break;
+        default:
+          break;
       }
     });
   }
 
+  // Show filter dialog with Reset button
+  void _showFilterDialog() {
+    // Get distinct values from the list for Year and Course filtering.
+    final years = <String>{"All"};
+    final courses = <String>{"All"};
+    for (var s in widget.registeredSemesters) {
+      if (s['year'] != null) years.add(s['year']!);
+      if (s['course'] != null) courses.add(s['course']!);
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        // Temporary variables to hold changes in dialog.
+        String tempRole = roleFilter;
+        String tempYear = yearFilter;
+        String tempSemester = semesterFilter;
+        String tempCourse = courseFilter;
+        return AlertDialog(
+          title: const Text("Filter Options"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Role Filter
+                DropdownButtonFormField<String>(
+                  value: tempRole,
+                  decoration: const InputDecoration(labelText: "Role"),
+                  items: ["All", "Student", "Admin"].map((value) {
+                    return DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    tempRole = val!;
+                  },
+                ),
+                const SizedBox(height: 8),
+                // Year Filter
+                DropdownButtonFormField<String>(
+                  value: tempYear,
+                  decoration: const InputDecoration(labelText: "Year"),
+                  items: years.map((value) {
+                    return DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    tempYear = val!;
+                  },
+                ),
+                const SizedBox(height: 8),
+                // Semester Filter
+                DropdownButtonFormField<String>(
+                  value: tempSemester,
+                  decoration: const InputDecoration(labelText: "Semester"),
+                  items: ["All", "Fall", "Spring"].map((value) {
+                    return DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    tempSemester = val!;
+                  },
+                ),
+                const SizedBox(height: 8),
+                // Course Filter
+                DropdownButtonFormField<String>(
+                  value: tempCourse,
+                  decoration: const InputDecoration(labelText: "Course"),
+                  items: courses.map((value) {
+                    return DropdownMenuItem(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    tempCourse = val!;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Cancel
+              },
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Reset filters to default values
+                setState(() {
+                  roleFilter = "All";
+                  yearFilter = "All";
+                  semesterFilter = "All";
+                  courseFilter = "All";
+                });
+                _applyFilters();
+                Navigator.pop(context);
+              },
+              child: const Text("Reset"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  roleFilter = tempRole;
+                  yearFilter = tempYear;
+                  semesterFilter = tempSemester;
+                  courseFilter = tempCourse;
+                });
+                _applyFilters();
+                Navigator.pop(context);
+              },
+              child: const Text("Apply"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Adjust colors based on dark mode
     final bgColor = darkMode ? Colors.black : Colors.grey[100];
     final textColor = darkMode ? Colors.white : Colors.black;
     final cardBgColor = darkMode ? Colors.grey[850] : Colors.white;
@@ -99,7 +278,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Header with search field and right-aligned filter & sort
+            // Header with search field and right-aligned filter & sort controls
             Card(
               elevation: 4,
               color: headerCardColor,
@@ -132,9 +311,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       children: [
                         const Spacer(),
                         ElevatedButton.icon(
-                          onPressed: () {
-                            // Implement filter logic or show a filter dialog
-                          },
+                          onPressed: _showFilterDialog,
                           icon: const Icon(Icons.filter_list),
                           label: const Text("Filter"),
                           style: ElevatedButton.styleFrom(
@@ -145,8 +322,14 @@ class _DashboardPageState extends State<DashboardPage> {
                         DropdownButton<String>(
                           value: sortOption,
                           dropdownColor: cardBgColor,
-                          items: <String>["Year Ascending", "Year Descending"]
-                              .map((String value) {
+                          items: <String>[
+                            "Year Ascending",
+                            "Year Descending",
+                            "Semester Ascending",
+                            "Semester Descending",
+                            "Course Ascending",
+                            "Course Descending"
+                          ].map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
                               child: Text(value, style: TextStyle(color: textColor)),
@@ -156,7 +339,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             if (newValue != null) {
                               setState(() {
                                 sortOption = newValue;
-                                sortSemesters();
+                                _sortSemesters();
                               });
                             }
                           },
@@ -208,14 +391,20 @@ class _DashboardPageState extends State<DashboardPage> {
                                 children: [
                                   Text(
                                     semester['year'] ?? '',
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: textColor,
                                         ),
                                   ),
                                   Text(
                                     semester['semester'] ?? '',
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: textColor,
                                         ),
@@ -227,7 +416,10 @@ class _DashboardPageState extends State<DashboardPage> {
                               Center(
                                 child: Text(
                                   semester['course'] ?? '',
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: textColor,
                                       ),
