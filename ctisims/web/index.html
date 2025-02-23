@@ -43,18 +43,18 @@
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-analytics.js";
     // TODO: Add SDKs for Firebase products that you want to use
     // https://firebase.google.com/docs/web/setup#available-libraries
-  
+    import { getStorage } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-storage.js";
+    import { firebase_key } from '../lib/firebase_keys.dart';
     // Your web app's Firebase configuration
     // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-    import keys from '../lib/firebase_key.dart';
     const firebaseConfig = {
-      apiKey: keys.firebaseApiKey,
-      authDomain: keys.firebaseAuthDomain,
-      projectId: keys.firebaseProjectId,
-      storageBucket: keys.firebaseStorageBucket,
-      messagingSenderId: keys.firebaseMessagingSenderId,
-      appId: keys.firebaseAppId,
-      measurementId: keys.firebaseMeasurementId
+      apiKey: firebase_key.apiKey,
+      authDomain: firebase_key.authDomain,
+      projectId: firebase_key.projectId,
+      storageBucket: firebase_key.storageBucket,
+      messagingSenderId: firebase_key.messagingSenderId,
+      appId: firebase_key.appId,
+      measurementId: firebase_key.measurementId
     };
   
     // Initialize Firebase
