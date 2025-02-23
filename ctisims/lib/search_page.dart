@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 import 'submission_detail_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:html' as html;
 
 class SearchPage extends StatefulWidget {
   const SearchPage({Key? key}) : super(key: key);
@@ -11,6 +19,8 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   String? _selectedOption;
   final TextEditingController _bilkentIdController = TextEditingController();
+  String? _uploadFilePath;
+  Uint8List? _uploadFileBytes;
 
   // Dummy data for student submissions
   final List<Map<String, String>> _studentSubmissions = [
@@ -36,6 +46,8 @@ class _SearchPageState extends State<SearchPage> {
 
   List<Map<String, String>> _filteredSubmissions = [];
 
+  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +67,55 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _filteredSubmissions = _studentSubmissions;
     });
+  }
+
+  Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
+    try {
+      await Firebase.initializeApp();
+      String fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
+      final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+      Reference storageRef;
+      if (kIsWeb) {
+        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
+        final destination = "$destinationBase/$fileName";
+        storageRef = FirebaseStorage.instance.ref(destination);
+        final uploadTask = storageRef.putData(fileBytes);
+        final snapshot = await uploadTask.whenComplete(() => null);
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        print("Dosya başarıyla yüklendi: $downloadUrl");
+      } else {
+        final file = File(filePath!);
+        final destination = "$destinationBase/$fileName";
+        storageRef = FirebaseStorage.instance.ref(destination);
+        final uploadTask = storageRef.putFile(file);
+        final snapshot = await uploadTask.whenComplete(() => null);
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        print("Dosya başarıyla yüklendi: $downloadUrl");
+      }
+    } catch (e) {
+      print("Dosya yükleme sırasında bir hata oluştu: $e");
+    }
+  }
+
+  Future<void> downloadFile(String fileName) async {
+    try {
+      final String destination = "$destinationBase/$fileName";
+      final ref = FirebaseStorage.instance.ref(destination);
+      final downloadUrl = await ref.getDownloadURL();
+      if (kIsWeb) {
+        html.AnchorElement anchor = html.AnchorElement(href: downloadUrl);
+        anchor.download = fileName;
+        anchor.click();
+      } else {
+        final response = await http.get(Uri.parse(downloadUrl));
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final File file = File('${appDocDir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+        print("File downloaded to: ${file.path}");
+      }
+    } catch (e) {
+      print("Download error: $e");
+    }
   }
 
   @override
@@ -140,7 +201,7 @@ class _SearchPageState extends State<SearchPage> {
                             if (submission['companyEvaluation'] == 'Uploaded') ...[
                               ElevatedButton(
                                 onPressed: () {
-                                  // Implement download logic
+                                  downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
                                 },
                                 child: const Text('Download Company Evaluation Report'),
                               ),
@@ -153,15 +214,111 @@ class _SearchPageState extends State<SearchPage> {
                               ),
                             ] else ...[
                               ElevatedButton(
-                                onPressed: () {
-                                  // Implement file picker for company evaluation
+                                onPressed: () async {
+                                  if (kIsWeb) {
+                                    FilePickerResult? result = await FilePicker.platform.pickFiles();
+                                    if (result != null) {
+                                      setState(() {
+                                        _uploadFileBytes = result.files.single.bytes;
+                                        _uploadFilePath = result.files.single.name;
+                                      });
+                                    }
+                                  } else {
+                                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                                    if (result != null) {
+                                      setState(() {
+                                        _uploadFilePath = result.files.single.path;
+                                      });
+                                    }
+                                  }
                                 },
                                 child: const Text('Choose File'),
                               ),
+                              if (_uploadFilePath != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text('Seçilen dosya: $_uploadFilePath'),
+                                ),
                               const SizedBox(height: 8),
                               ElevatedButton(
-                                onPressed: () {
-                                  // Implement upload logic
+                                onPressed: () async {
+                                  if (kIsWeb) {
+                                    if (_uploadFileBytes != null) {
+                                      try {
+                                        await uploadFile(fileBytes: _uploadFileBytes);
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Success"),
+                                            content: const Text("File uploaded successfully."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Error"),
+                                            content: const Text("File not uploaded."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text("Error"),
+                                          content: const Text("No file selected."),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    if (_uploadFilePath != null) {
+                                      try {
+                                        await uploadFile(filePath: _uploadFilePath);
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Success"),
+                                            content: const Text("File uploaded successfully."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Error"),
+                                            content: const Text("File not uploaded."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text("Error"),
+                                          content: const Text("No file selected."),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                                 child: const Text('Upload'),
                               ),
