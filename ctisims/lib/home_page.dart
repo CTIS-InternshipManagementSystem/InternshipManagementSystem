@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -77,6 +78,26 @@ class _HomePageState extends State<HomePage> {
           _deadlineController.text = pickedDate.toString();
         });
       }
+    }
+  }
+
+  Future<void> _addUser() async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: 'temporaryPassword123', // Temporary password
+      );
+
+      // Send password reset email
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User added and password reset email sent')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add user: $e')),
+      );
     }
   }
 
@@ -428,13 +449,14 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         debugPrint('Name: ${_nameController.text}');
                         debugPrint('Mail: ${_emailController.text}');
                         debugPrint('Bilkent ID: ${_bilkentIdController.text}');
                         debugPrint('Role: $_selectedRole');
                         debugPrint('Supervisor: $_selectedSupervisor');
                         debugPrint('Semester: $_selectedUserSemester');
+                        await _addUser();
                       },
                       child: const Text('Submit'),
                     ),
