@@ -65,7 +65,7 @@ class AppStyles {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -243,7 +243,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 label: buttonText,
                 child: ElevatedButton(
                   onPressed: () => _openModal(modalContent),
-                  child: Text(buttonText),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppStyles.buttonColor,
                     shape: RoundedRectangleBorder(
@@ -251,6 +250,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                   ),
+                  child: Text(buttonText),
                 ),
               ),
             ),
@@ -284,7 +284,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             alignment: Alignment.centerRight,
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppStyles.buttonColor,
                 shape: RoundedRectangleBorder(
@@ -292,6 +291,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
               ),
+              child: const Text('Close'),
             ),
           ),
         ],
@@ -301,9 +301,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   /// Modal content for "Change Deadline Settings" (Section 2).
   Widget _changeDeadlineModalContent() {
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
-      key: _formKey,
+      key: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -351,7 +351,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             Provider.of<HomePageModel>(context, listen: false).updateOption(value);
                           },
                         ))
-                    .toList(),
+                    ,
               ],
             ),
           AppStyles.fieldSpacing,
@@ -379,7 +379,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               debugPrint('Selected option: ${Provider.of<HomePageModel>(context, listen: false).selectedOption}');
               Navigator.pop(context);
             },
-            child: const Text('Update'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppStyles.buttonColor,
               shape: RoundedRectangleBorder(
@@ -387,6 +386,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
+            child: const Text('Update'),
           ),
         ],
       ),
@@ -395,9 +395,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   /// Modal content for "Create Semester" (Section 3).
   Widget _createSemesterModalContent() {
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
-      key: _formKey,
+      key: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -458,7 +458,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               debugPrint('Course: ${Provider.of<HomePageModel>(context, listen: false).selectedCourse}');
               Navigator.pop(context);
             },
-            child: const Text('Create'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppStyles.buttonColor,
               shape: RoundedRectangleBorder(
@@ -466,6 +465,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
+            child: const Text('Create'),
           ),
         ],
       ),
@@ -474,9 +474,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   /// Modal content for "Add User" (Section 4).
   Widget _addUserModalContent() {
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
-      key: _formKey,
+      key: formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -575,7 +575,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           AppStyles.fieldSpacing,
           ElevatedButton(
             onPressed: () {
-              if (_formKey.currentState!.validate()) {
+              if (formKey.currentState!.validate()) {
                 debugPrint('Name: ${_nameController.text}');
                 debugPrint('Mail: ${_emailController.text}');
                 debugPrint('Bilkent ID: ${_bilkentIdController.text}');
@@ -585,7 +585,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Navigator.pop(context);
               }
             },
-            child: const Text('Submit'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppStyles.buttonColor,
               shape: RoundedRectangleBorder(
@@ -593,6 +592,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
+            child: const Text('Submit'),
           ),
         ],
       ),
