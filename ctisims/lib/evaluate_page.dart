@@ -23,7 +23,7 @@ class AppStyles {
 class EvaluatePage extends StatefulWidget {
   final Map<String, String> submission;
 
-  const EvaluatePage({Key? key, required this.submission}) : super(key: key);
+  const EvaluatePage({super.key, required this.submission});
 
   @override
   _EvaluatePageState createState() => _EvaluatePageState();
@@ -275,10 +275,10 @@ class _EvaluatePageState extends State<EvaluatePage> {
                             }
                           }
                         },
-                        child: const Text('Choose File'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppStyles.buttonColor,
                         ),
+                        child: const Text('Choose File'),
                       ),
                       if (_filePath != null)
                         Padding(
@@ -308,6 +308,9 @@ class _EvaluatePageState extends State<EvaluatePage> {
                                   }
                                 }
                               },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppStyles.buttonColor,
+                        ),
                         child: _isUploading
                             ? const SizedBox(
                                 height: 24,
@@ -318,9 +321,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
                                 ),
                               )
                             : const Text('Upload Company Evaluation'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppStyles.buttonColor,
-                        ),
                       ),
                       const SizedBox(height: 8),
                       Form(
@@ -367,8 +367,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
               onPressed: () {
                 downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
               },
-              child: Text('Download $title'),
               style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
+              child: Text('Download $title'),
             ),
             const SizedBox(height: 8),
             TextFormField(
@@ -407,8 +407,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
               onPressed: () {
                 downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
               },
-              child: const Text('Download Report'),
               style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
+              child: const Text('Download Report'),
             ),
             const SizedBox(height: 8),
             TextFormField(

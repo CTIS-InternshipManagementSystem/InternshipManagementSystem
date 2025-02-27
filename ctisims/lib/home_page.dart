@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'dashboard_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
-/// Simple state model for HomePage selections.
 class HomePageModel extends ChangeNotifier {
   String? selectedYear;
   String? selectedSemester;
@@ -54,7 +54,6 @@ class HomePageModel extends ChangeNotifier {
   }
 }
 
-/// Centralized styling constants.
 class AppStyles {
   static const primaryColor = Colors.orange;
   static const buttonColor = Colors.blue;
@@ -71,14 +70,12 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
-  // Controllers for fields outside modals.
+class _HomePageState extends State<HomePage> {
   final TextEditingController _deadlineController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bilkentIdController = TextEditingController();
 
-  // Dropdown lists.
   final List<String> _years = ['2023', '2024', '2025'];
   final List<String> _semesters = ['Fall', 'Spring'];
   final List<String> _courses = ['CTIS310', 'CTIS290'];
@@ -95,37 +92,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   ];
   final List<String> _supervisors = ['Dr. Smith', 'Dr. Brown', 'Dr. Johnson'];
 
-  // Sample data for registered semesters.
   final List<Map<String, String>> _registeredSemesters = [
     {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS310', 'role': 'Student'},
     {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Student'},
     {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Admin'},
   ];
-
-  // Animation for subtle fade-in.
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _deadlineController.dispose();
-    _nameController.dispose();
-    _emailController.dispose();
-    _bilkentIdController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
 
   Future<void> _selectDeadlineDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
@@ -158,45 +129,111 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  /// Helper method to open a modal with custom fade-scale transition.
-  Future<void> _openModal(Widget modalContent) async {
-    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
-    await showGeneralDialog(
-      context: context,
-      barrierLabel: "Modal",
-      barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.5),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, anim1, anim2) {
-        return Align(
-          alignment: Alignment.center,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+  Future<void> _addUser() async {
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: 'temporaryPassword123',
+      );
+
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User added and password reset email sent')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add user: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CTIS IMS'),
+        backgroundColor: AppStyles.primaryColor,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DashboardPage(registeredSemesters: _registeredSemesters),
+                ),
+              );
+            },
+            child: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
+          TextButton(
+            onPressed: () {},
+            child: const Text('Begin (Dr.)', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: AppStyles.padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
               padding: AppStyles.padding,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: ChangeNotifierProvider.value(
-                value: homePageModel,
-                child: SingleChildScrollView(child: modalContent),
+              child: Center(
+                child: Text(
+                  'Initialize Semester & Add Users',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 28,
+                      ),
+                ),
               ),
             ),
-          ),
-        );
-      },
-      transitionBuilder: (context, anim1, anim2, child) {
-        return FadeTransition(
-          opacity: anim1,
-          child: ScaleTransition(scale: anim1, child: child),
-        );
-      },
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'Current Deadline Settings',
+              headerIcon: Icons.settings,
+              buttonText: 'View Settings',
+              modalContent: _currentDeadlineModalContent(),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'Change Deadline Settings',
+              headerIcon: Icons.schedule,
+              buttonText: 'Edit',
+              modalContent: _changeDeadlineModalContent(),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'Create Semester',
+              headerIcon: Icons.add_circle_outline,
+              buttonText: 'Create',
+              modalContent: _createSemesterModalContent(),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'Add User',
+              headerIcon: Icons.person_add_alt,
+              buttonText: 'Add User',
+              modalContent: _addUserModalContent(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  /// Helper widget to build a section card with header icon, title, explanation, and button to open modal.
   Widget _buildSectionCard({
     required String headerTitle,
     required IconData headerIcon,
@@ -208,7 +245,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppStyles.borderRadius),
       ),
-      margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: AppStyles.padding,
         child: Column(
@@ -260,7 +296,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  /// Modal content for "Current Deadline Settings" (Section 1).
+  Future<void> _openModal(Widget modalContent) async {
+    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    await showGeneralDialog(
+      context: context,
+      barrierLabel: "Modal",
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return Align(
+          alignment: Alignment.center,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: AppStyles.padding,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+              ),
+              child: ChangeNotifierProvider.value(
+                value: homePageModel,
+                child: SingleChildScrollView(child: modalContent),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(scale: anim1, child: child),
+        );
+      },
+    );
+  }
+
   Widget _currentDeadlineModalContent() {
     return Form(
       child: Column(
@@ -274,10 +346,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
-          const Text('First submission deadline (in days): 30'),
+          const Text('CTIS 310'),
+          const Text('Follow Up1 - Deadline: 30 days'),
+          const Text('Follow Up2 - Deadline: 60 days'),
+          const Text('Follow Up3 - Deadline: 90 days'),
+          const Text('Follow Up4 - Deadline: 120 days'),
+          const Text('Follow Up5 - Deadline: 150 days'),
+          const Text('Report - Deadline: 180 days'),
+          AppStyles.fieldSpacing,
+          const Text('CTIS 290'),
+          const Text('Report - Deadline: 90 days'),
           AppStyles.fieldSpacing,
           const Text('Last edited by: Begin (Dr.)'),
-          AppStyles.fieldSpacing,
           const Text('Last update: May 29th 2023 12:25:06 am'),
           AppStyles.fieldSpacing,
           Align(
@@ -299,7 +379,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  /// Modal content for "Change Deadline Settings" (Section 2).
   Widget _changeDeadlineModalContent() {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
@@ -351,7 +430,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             Provider.of<HomePageModel>(context, listen: false).updateOption(value);
                           },
                         ))
-                    ,
+                    .toList(),
               ],
             ),
           AppStyles.fieldSpacing,
@@ -393,7 +472,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  /// Modal content for "Create Semester" (Section 3).
   Widget _createSemesterModalContent() {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
@@ -472,7 +550,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  /// Modal content for "Add User" (Section 4).
   Widget _addUserModalContent() {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     return Form(
@@ -500,13 +577,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           TextFormField(
             controller: _emailController,
             decoration: const InputDecoration(
-              labelText: 'Mail',
+              labelText: 'Email',
               border: OutlineInputBorder(),
             ),
-            keyboardType: TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.isEmpty) return 'Please enter an email';
-              if (!value.contains('@')) return 'Enter a valid email';
               return null;
             },
           ),
@@ -517,7 +592,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               labelText: 'Bilkent ID',
               border: OutlineInputBorder(),
             ),
-            keyboardType: TextInputType.number,
             validator: (value) {
               if (value == null || value.isEmpty) return 'Please enter a Bilkent ID';
               return null;
@@ -539,24 +613,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             },
           ),
           AppStyles.fieldSpacing,
-          if (Provider.of<HomePageModel>(context, listen: false).selectedRole == 'Student') ...[
-            DropdownButtonFormField<String>(
-              isExpanded: true,
-              value: Provider.of<HomePageModel>(context, listen: false).selectedSupervisor,
-              decoration: const InputDecoration(
-                labelText: 'Supervisor',
-                border: OutlineInputBorder(),
-              ),
-              items: _supervisors
-                  .map((supervisor) =>
-                      DropdownMenuItem(value: supervisor, child: Text(supervisor)))
-                  .toList(),
-              onChanged: (value) {
-                Provider.of<HomePageModel>(context, listen: false).updateSupervisor(value);
-              },
-            ),
-            AppStyles.fieldSpacing,
-          ],
           DropdownButtonFormField<String>(
             isExpanded: true,
             value: Provider.of<HomePageModel>(context, listen: false).selectedUserSemester,
@@ -564,24 +620,36 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               labelText: 'Semester',
               border: OutlineInputBorder(),
             ),
-            items: _semesters
-                .map((semester) =>
-                    DropdownMenuItem(value: semester, child: Text(semester)))
+            items: _registeredSemesters
+                .map((semester) => DropdownMenuItem(
+                      value: '${semester['year']} - ${semester['semester']}',
+                      child: Text('${semester['year']} - ${semester['semester']}'),
+                    ))
                 .toList(),
             onChanged: (value) {
               Provider.of<HomePageModel>(context, listen: false).updateUserSemester(value);
             },
           ),
           AppStyles.fieldSpacing,
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: Provider.of<HomePageModel>(context, listen: false).selectedSupervisor,
+            decoration: const InputDecoration(
+              labelText: 'Supervisor',
+              border: OutlineInputBorder(),
+            ),
+            items: _supervisors
+                .map((supervisor) => DropdownMenuItem(value: supervisor, child: Text(supervisor)))
+                .toList(),
+            onChanged: (value) {
+              Provider.of<HomePageModel>(context, listen: false).updateSupervisor(value);
+            },
+          ),
+          AppStyles.fieldSpacing,
           ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                debugPrint('Name: ${_nameController.text}');
-                debugPrint('Mail: ${_emailController.text}');
-                debugPrint('Bilkent ID: ${_bilkentIdController.text}');
-                debugPrint('Role: ${Provider.of<HomePageModel>(context, listen: false).selectedRole}');
-                debugPrint('Supervisor: ${Provider.of<HomePageModel>(context, listen: false).selectedSupervisor}');
-                debugPrint('Semester: ${Provider.of<HomePageModel>(context, listen: false).selectedUserSemester}');
+                _addUser();
                 Navigator.pop(context);
               }
             },
@@ -592,142 +660,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
-            child: const Text('Submit'),
+            child: const Text('Add User'),
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HomePageModel(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('CTIS IMS'),
-          backgroundColor: AppStyles.primaryColor,
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DashboardPage(registeredSemesters: _registeredSemesters),
-                  ),
-                );
-              },
-              child: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ),
-            TextButton(
-              onPressed: () {},
-              child: const Text('Begin (Dr.)', style: TextStyle(color: Colors.white, fontSize: 16)),
-            ),
-          ],
-        ),
-        drawer: Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: AppStyles.primaryColor,
-                ),
-                child: const Text(
-                  'CTIS IMS Menu',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.dashboard),
-                title: const Text('Dashboard'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            DashboardPage(registeredSemesters: _registeredSemesters)),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.add),
-                title: const Text('Create Semester'),
-                onTap: () {
-                  // Navigate to Create Semester page if available.
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_add),
-                title: const Text('Add User'),
-                onTap: () {
-                  // Navigate to Add User page if available.
-                },
-              ),
-            ],
-          ),
-        ),
-        body: SingleChildScrollView(
-          padding: AppStyles.padding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Section with centered title.
-              Container(
-                padding: AppStyles.padding,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    'Initialize Semester & Add Users',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 28,
-                        ),
-                  ),
-                ),
-              ),
-              AppStyles.fieldSpacing,
-              // Section 1: Current Deadline Settings with a settings icon.
-              _buildSectionCard(
-                headerTitle: 'Current Deadline Settings',
-                headerIcon: Icons.settings,
-                buttonText: 'View Settings',
-                modalContent: _currentDeadlineModalContent(),
-              ),
-              // Section 2: Change Deadline Settings.
-              _buildSectionCard(
-                headerTitle: 'Change Deadline Settings',
-                headerIcon: Icons.schedule,
-                buttonText: 'Edit',
-                modalContent: _changeDeadlineModalContent(),
-              ),
-              // Section 3: Create Semester.
-              _buildSectionCard(
-                headerTitle: 'Create Semester',
-                headerIcon: Icons.add_circle_outline,
-                buttonText: 'Create',
-                modalContent: _createSemesterModalContent(),
-              ),
-              // Section 4: Add User.
-              _buildSectionCard(
-                headerTitle: 'Add User',
-                headerIcon: Icons.person_add_alt,
-                buttonText: 'Add User',
-                modalContent: _addUserModalContent(),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

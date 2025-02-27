@@ -7,8 +7,7 @@ import 'search_page.dart';
 class DashboardPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters;
 
-  const DashboardPage({Key? key, required this.registeredSemesters})
-      : super(key: key);
+  const DashboardPage({super.key, required this.registeredSemesters});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();

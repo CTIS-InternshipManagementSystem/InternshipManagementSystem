@@ -11,7 +11,7 @@ import 'dart:html' as html;
 
 class SubmissionDetailPage extends StatefulWidget {
   final Map<String, String> submission;
-  const SubmissionDetailPage({Key? key, required this.submission}) : super(key: key);
+  const SubmissionDetailPage({super.key, required this.submission});
 
   @override
   _SubmissionDetailPageState createState() => _SubmissionDetailPageState();
