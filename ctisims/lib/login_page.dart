@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
   
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -90,7 +90,7 @@ class _LoginPageState extends State<LoginPage> {
           child: AnimatedOpacity(
             opacity: _opacity,
             duration: const Duration(milliseconds: 800),
-            child: Container(
+            child: SizedBox(
               width: 400, // Fixed width for a modern container look
               child: Card(
                 elevation: 8,

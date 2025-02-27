@@ -13,7 +13,7 @@ class AppStyles {
 class ExportPage extends StatefulWidget {
   final List<Map<String, String>> semesters;
 
-  const ExportPage({Key? key, required this.semesters}) : super(key: key);
+  const ExportPage({super.key, required this.semesters});
 
   @override
   _ExportPageState createState() => _ExportPageState();

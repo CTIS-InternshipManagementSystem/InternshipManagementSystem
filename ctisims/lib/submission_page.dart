@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 class SubmissionPage extends StatefulWidget {
   final String course;
 
-  const SubmissionPage({Key? key, required this.course}) : super(key: key);
+  const SubmissionPage({super.key, required this.course});
 
   @override
   _SubmissionPageState createState() => _SubmissionPageState();
