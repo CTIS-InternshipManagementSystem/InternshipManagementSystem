@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart';
@@ -32,7 +31,8 @@ class DBHelper {
           CREATE TABLE IF NOT EXISTS Semester (
             id TEXT PRIMARY KEY,
             year TEXT NOT NULL,
-            semester TEXT NOT NULL
+            semester TEXT NOT NULL,
+            isActive INTEGER NOT NULL
           )
         ''');
 
@@ -48,6 +48,15 @@ class DBHelper {
             FOREIGN KEY (supervisorId) REFERENCES User(id)
           )
         ''');
+
+        // Insert default user
+        await db.insert('User', {
+          'id': '1',
+          'name': 'Bilgehan',
+          'email': 'bilgehan@example.com',
+          'bilkentId': '22002357',
+          'role': 'Admin'
+        });
 
         // Course tablosu
         await db.execute('''
@@ -88,6 +97,7 @@ class DBHelper {
           CREATE TABLE IF NOT EXISTS Grade (
             id TEXT PRIMARY KEY,
             studentId TEXT NOT NULL,
+            courseId TEXT NOT NULL,
             assignmentId TEXT NOT NULL,
             grade INTEGER NOT NULL,
             FOREIGN KEY (studentId) REFERENCES User(id),
@@ -112,6 +122,7 @@ class DBHelper {
         await db.execute('''
           CREATE TABLE IF NOT EXISTS Submission (
             id TEXT PRIMARY KEY,
+            courseId TEXT NOT NULL,
             studentId TEXT NOT NULL,
             assignmentId TEXT NOT NULL,
             comments TEXT NOT NULL,
@@ -123,33 +134,6 @@ class DBHelper {
       },
     );
   }
-
-  /// ********** Ortak HTTP Fonksiyonları **********
-// Update your static request methods like this:
-static Future<http.Response> post(String endpoint, Map<String, dynamic> body) async {
-  final url = Uri.parse('https://7ab8-139-179-233-241.ngrok-free.app/$endpoint');
-  return await http.post(
-    url,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'ngrok-skip-browser-warning': 'true' // Bypass ngrok browser warning
-    },
-    body: jsonEncode(body),
-  );
-}
-
-static Future<http.Response> get(String endpoint) async {
-  final url = Uri.parse('https://7ab8-139-179-233-241.ngrok-free.app/$endpoint');
-  return await http.get(
-    url,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'ngrok-skip-browser-warning': 'true'
-    },
-  );
-}
 
   /// ********** Veritabanı CRUD İşlemleri (opsiyonel) **********
   static Future<int> insert(String table, Map<String, dynamic> data) async {
@@ -172,203 +156,301 @@ static Future<http.Response> get(String endpoint) async {
     return await _database!.delete(table, where: where, whereArgs: whereArgs);
   }
 
-  /// ********** Backend Endpoint Metotları **********
-
   // POST login: email gönderilir, dönen response içinde role, bilkentId ve username beklenir.
   static Future<Map<String, dynamic>> login(String email) async {
-    final response = await post('login', {
-      'email': email
-    });
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+    final List<Map<String, dynamic>> users = await query('User');
+    for (var user in users) {
+      if (user['email'] == email) {
+        return {
+          'role': user['role'],
+          'bilkentId': user['bilkentId'],
+          'username': user['name']
+        };
+      }
     }
-    throw Exception('Login başarısız');
+    throw Exception('Login failed');
   }
 
   // POST AddUser: Yeni kullanıcı ekler.
   static Future<void> addUser(String name, String email, String bilkentId, String role, String semester, String supervisor) async {
-    final response = await post('AddUser', {
+    await insert('User', {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'name': name,
       'email': email,
       'bilkentId': bilkentId,
       'role': role,
-      'semester': semester,
-      'supervisor': supervisor,
+      'supervisorId': supervisor,
     });
-    if (response.statusCode != 200) {
-      throw Exception('Kullanıcı eklenemedi');
-    }
   }
 
   // GET activeSemester: Aktif dönemi döner (örneğin "2024-2023 Fall")
   static Future<String> getActiveSemester() async {
-    final response = await get('activeSemester');
-    if (response.statusCode == 200) {
-      // Dönen JSON örn: { "activeSemester": "2024-2023 Fall" }
-      return jsonDecode(response.body)['activeSemester'];
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'Semester',
+      where: 'isActive = ?',
+      whereArgs: [1],
+    );
+    if (result.isNotEmpty) {
+      final activeSemester = result.first;
+      return '${activeSemester['year']} ${activeSemester['semester']}';
     }
-    throw Exception('Aktif dönem alınamadı');
+    throw Exception('Failed to fetch active semester');
   }
 
-  // GET Teacher: Öğretmen listesini döner
-  static Future<List<dynamic>> getTeachers() async {
-    final response = await get('Teacher');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // GET Admins: Admin listesini döner
+  static Future<List<Map<String, dynamic>>> getAdmins() async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'User',
+      where: 'role = ?',
+      whereArgs: ['admin'],
+    );
+    if (result.isNotEmpty) {
+      return result;
     }
-    throw Exception('Öğretmen bilgileri alınamadı');
+    throw Exception('Failed to fetch admin info');
   }
 
   // POST createSemester: Yeni dönem ve kurs ekler.
-  static Future<void> createSemester(String year, String semester, String course) async {
-    final response = await post('createSemester', {
+  static Future<void> createSemester(String year, String semester, int isActive) async {
+    await insert('Semester', {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'year': year,
       'semester': semester,
-      'course': course,
+      'isActive': isActive,
     });
-    if (response.statusCode != 200) {
-      throw Exception('Dönem oluşturulamadı');
-    }
   }
 
   // POST CheangeDeadlineSettings: Belirli bir kurs ve assignment için deadline değişikliği yapar.
-  static Future<void> changeDeadlineSettings(String course, String assignment, DateTime deadline) async {
-    final response = await post('CheangeDeadlineSettings', {
-      'course': course,
-      'assignment': assignment,
-      'deadline': deadline.toIso8601String(),
-    });
-    if (response.statusCode != 200) {
-      throw Exception('Deadline değiştirilemedi');
-    }
+  static Future<void> changeDeadlineSettings(String courseId, String assignmentName, DateTime deadline) async {
+    await update(
+      'Deadline',
+      {'deadline': deadline.toIso8601String()},
+      'courseId = ? AND assignmentName = ?',
+      [courseId, assignmentName],
+    );
   }
 
   // GET CurrentDeadline310: CTIS310 için deadline bilgilerini döner.
-  static Future<Map<String, dynamic>> getCurrentDeadline310() async {
-    final response = await get('CurrentDeadline310');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  static Future<List<Map<String, dynamic>>> getCurrentDeadline310() async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'Deadline',
+      where: 'courseId = ?',
+      whereArgs: ['310'],
+    );
+    if (result.isNotEmpty) {
+      return result;
     }
-    throw Exception('CTIS310 deadline bilgileri alınamadı');
+    throw Exception('Failed to fetch CTIS310 deadline info');
   }
 
-  // GET CurrentDeadline290: CTIS290 için deadline bilgisini döner.
-  static Future<Map<String, dynamic>> getCurrentDeadline290() async {
-    final response = await get('CurrentDeadline290');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // GET CurrentDeadline290: CTIS290 için deadline bilgilerini döner.
+  static Future<List<Map<String, dynamic>>> getCurrentDeadline290() async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'Deadline',
+      where: 'courseId = ?',
+      whereArgs: ['290'],
+    );
+    if (result.isNotEmpty) {
+      return result;
     }
-    throw Exception('CTIS290 deadline bilgisi alınamadı');
+    throw Exception('Failed to fetch CTIS290 deadline info');
   }
 
-  // GET allCoursesforAdmin: Admin için tüm kurs bilgilerini döner.
-  static Future<List<dynamic>> getAllCoursesForAdmin() async {
-    final response = await get('allCoursesforAdmin');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // GET allCourses: Tüm kurs bilgilerini döner.
+  static Future<List<Map<String, dynamic>>> getAllCourses() async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query('Course');
+    if (result.isNotEmpty) {
+      return result;
     }
-    throw Exception('Admin kurs bilgileri alınamadı');
+    throw Exception('Failed to fetch course info');
   }
 
-  // GET getActiveCourseforStudent: Öğrenci için aktif kursu döner.
-  static Future<Map<String, dynamic>> getActiveCourseForStudent() async {
-    final response = await get('getActiveCourseforStudent');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // GET getActiveCourses: Aktif kursları döner.
+  static Future<List<Map<String, dynamic>>> getActiveCourses() async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'Course',
+      where: 'isActive = ?',
+      whereArgs: [1],
+    );
+    if (result.isNotEmpty) {
+      return result;
     }
-    throw Exception('Öğrenci için aktif kurs bilgisi alınamadı');
+    throw Exception('Failed to fetch active course info');
   }
+  
 
   // POST submit310: CTIS310 için öğrenci gönderimi.
   static Future<void> submit310(String bilkentId, String comments, String assignment) async {
-    final response = await post('submit310', {
-      'bilkentId': bilkentId,
+    await insert('Submission', {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'courseId': '310',
+      'studentId': bilkentId,
+      'assignmentId': assignment,
       'comments': comments,
-      'assignment': assignment,
+      'submittedAt': DateTime.now().toIso8601String(),
     });
-    if (response.statusCode != 200) {
-      throw Exception('CTIS310 gönderimi yapılamadı');
-    }
   }
 
   // POST submit290: CTIS290 için öğrenci gönderimi.
-  static Future<void> submit290(String bilkentId, String comments) async {
-    final response = await post('submit290', {
-      'bilkentId': bilkentId,
+  static Future<void> submit290(String bilkentId, String comments, String assignment) async {
+    await insert('Submission', {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'courseId': '290',
+      'studentId': bilkentId,
+      'assignmentId': assignment,
       'comments': comments,
+      'submittedAt': DateTime.now().toIso8601String(),
     });
-    if (response.statusCode != 200) {
-      throw Exception('CTIS290 gönderimi yapılamadı');
-    }
   }
 
   // GET StudentsfomCourses: Belirli kurs tarih, dönem ve koduna göre öğrencileri döner.
-  static Future<List<dynamic>> getStudentsFromCourses(String courseDate, String courseSemester, String courseCode) async {
-    final response = await get('StudentsfomCourses?courseDate=$courseDate&courseSemester=$courseSemester&courseCode=$courseCode');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  static Future<List<Map<String, dynamic>>> getStudentsFromCourses(String courseId) async {
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'StudentCourse',
+      where: 'courseId = ?',
+      whereArgs: [courseId],
+    );
+    if (result.isNotEmpty) {
+      List<Map<String, dynamic>> students = [];
+      for (var studentCourse in result) {
+        final List<Map<String, dynamic>> user = await _database!.query(
+          'User',
+          where: 'id = ?',
+          whereArgs: [studentCourse['studentId']],
+        );
+        if (user.isNotEmpty) {
+          students.add(user.first);
+        }
+      }
+      return students;
     }
-    throw Exception('Kurs öğrencileri alınamadı');
+    throw Exception('Failed to fetch course students');
   }
 
   // GET StudentsInfo: Belirli bir bilkentId için öğrenci bilgilerini döner.
   static Future<Map<String, dynamic>> getStudentInfo(String bilkentId) async {
-    final response = await get('StudentsInfo?bilkentId=$bilkentId');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+    await init();
+    final List<Map<String, dynamic>> result = await _database!.query(
+      'User',
+      where: 'bilkentId = ?',
+      whereArgs: [bilkentId],
+    );
+    if (result.isNotEmpty) {
+      return result.first;
     }
-    throw Exception('Öğrenci bilgileri alınamadı');
+    throw Exception('Failed to fetch student info');
   }
 
   // POST enterGrade: Belirtilen parametrelerle not girilmesini sağlar.
   static Future<void> enterGrade(
       String bilkentId,
-      String courseDate,
-      String courseSemester,
-      String courseCode,
-      String assignmentName,
+      String courseId,
+      String assignmentId,
       int grade) async {
-    final response = await post('enterGrade', {
-      'bilkentId': bilkentId,
-      'courseDate': courseDate,
-      'courseSemester': courseSemester,
-      'courseCode': courseCode,
-      'assignmentName': assignmentName,
+    await insert('Grade', {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'studentId': bilkentId,
+      'courseId': courseId,
+      'assignmentId': assignmentId,
       'grade': grade,
     });
-    if (response.statusCode != 200) {
-      throw Exception('Not girilemedi');
-    }
   }
 
   // GET getAllGrades: Belirtilen kurs parametrelerine göre tüm notları döner.
-  // CTIS310 için followup1-5 ve report, CTIS290 için sadece report notu döner.
-  static Future<Map<String, dynamic>> getAllGrades(String courseDate, String courseSemester, String courseCode) async {
-    final response = await get('getAllGrades?courseDate=$courseDate&courseSemester=$courseSemester&courseCode=$courseCode');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // CTIS310 ve CTIS290 için tüm öğrencilerin notlarını döner.
+  static Future<Map<String, dynamic>> getAllGrades(String courseId) async {
+    await init();
+    List<Map<String, dynamic>> result;
+    if (courseId == 'CTIS310') {
+      result = await _database!.query(
+        'Grade',
+        where: 'courseId = ?',
+        whereArgs: [courseId],
+      );
+    } else if (courseId == 'CTIS290') {
+      result = await _database!.query(
+        'Grade',
+        where: 'courseId = ?',
+        whereArgs: [courseId],
+      );
+    } else {
+      throw Exception('Invalid courseId');
     }
-    throw Exception('Not bilgileri alınamadı');
+
+    if (result.isNotEmpty) {
+      Map<String, Map<String, dynamic>> grades = {};
+      for (var grade in result) {
+        final student = await getStudentInfo(grade['studentId']);
+        final assignment = await _database!.query(
+          'Assignment',
+          where: 'id = ?',
+          whereArgs: [grade['assignmentId']],
+        );
+        if (assignment.isNotEmpty) {
+          String assignmentName = assignment.first['name'] as String;
+          if (!grades.containsKey(student['id'])) {
+            grades[student['id']] = {
+              'name': student['name'],
+              'surname': student['surname'],
+              'grades': {}
+            };
+          }
+          grades[student['id']]!['grades'][assignmentName] = grade['grade'];
+        }
+      }
+      return {'grades': grades};
+    }
+    throw Exception('Failed to fetch grade info');
   }
 
   // POST DeactiveCourse: Belirtilen kursu devre dışı bırakır.
-  static Future<void> deactiveCourse(String courseDate, String courseSemester, String courseCode) async {
-    final response = await post('DeactiveCourse', {
-      'courseDate': courseDate,
-      'courseSemester': courseSemester,
-      'courseCode': courseCode,
-    });
-    if (response.statusCode != 200) {
-      throw Exception('Kurs devre dışı bırakılamadı');
-    }
+  static Future<void> deactiveCourse(String courseId) async {
+    await update(
+      'Course',
+      {'isActive': 0},
+      'id = ?',
+      [courseId],
+    );
   }
 
   // GET AllStudents: Tüm öğrencileri ve ilgili kurs bilgilerini döner.
-  static Future<List<dynamic>> getAllStudents() async {
-    final response = await get('AllStudents');
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  static Future<List<Map<String, dynamic>>> getAllStudents() async {
+    await init();
+    final List<Map<String, dynamic>> students = await _database!.query('User', where: 'role = ?', whereArgs: ['student']);
+    List<Map<String, dynamic>> studentCourses = [];
+
+    for (var student in students) {
+      final List<Map<String, dynamic>> courses = await _database!.query(
+        'StudentCourse',
+        where: 'studentId = ?',
+        whereArgs: [student['id']],
+      );
+
+      List<Map<String, dynamic>> courseDetails = [];
+      for (var course in courses) {
+        final List<Map<String, dynamic>> courseInfo = await _database!.query(
+          'Course',
+          where: 'id = ?',
+          whereArgs: [course['courseId']],
+        );
+        if (courseInfo.isNotEmpty) {
+          courseDetails.add(courseInfo.first);
+        }
+      }
+
+      studentCourses.add({
+        'student': student,
+        'courses': courseDetails,
+      });
     }
-    throw Exception('Öğrenci listesi alınamadı');
+
+    return studentCourses;
   }
 }

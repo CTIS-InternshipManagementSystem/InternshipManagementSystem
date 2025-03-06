@@ -59,7 +59,7 @@ class _ExportPageState extends State<ExportPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Export Grades & Statistics'),
+        title: const Text('Export Grades & Files'),
         backgroundColor: AppStyles.primaryColor,
         centerTitle: true,
         actions: [
@@ -187,46 +187,6 @@ class _ExportPageState extends State<ExportPage> {
                                             )
                                           : const Icon(Icons.grade),
                                       label: const Text("Export Grades"),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppStyles.buttonColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
-                                      ),
-                                    ),
-                                  ),
-                                  AppStyles.fieldSpacing,
-                                  // Export Statistics Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed: _statisticsLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _statisticsLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
-                                                setState(() {
-                                                  _statisticsLoading[index] = false;
-                                                });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Statistics exported successfully")),
-                                                );
-                                              });
-                                            },
-                                      icon: _statisticsLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.bar_chart),
-                                      label: const Text("Export Stats"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
