@@ -1,3 +1,4 @@
+import 'package:ctisims/dbHelper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_page.dart';
@@ -51,14 +52,17 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      await DBHelper.login(_emailController.text.trim());
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
+      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login failed: ${e.toString()}')),
       );
+      print('Login is unsuccesful: $e');
     } finally {
       if (mounted) {
         setState(() {

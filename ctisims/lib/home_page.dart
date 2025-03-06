@@ -1,3 +1,4 @@
+import 'package:ctisims/dbHelper.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -131,6 +132,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _addUser() async {
     try {
+      DBHelper.addUser(_nameController.text, _emailController.text, _bilkentIdController.text, 
+            Provider.of<HomePageModel>(context, listen: false).selectedRole ?? '',
+            Provider.of<HomePageModel>(context, listen: false).selectedUserSemester ?? '',
+            Provider.of<HomePageModel>(context, listen: false).selectedSupervisor ?? '');
+      
+
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text,
         password: 'temporaryPassword123',
@@ -430,7 +437,7 @@ class _HomePageState extends State<HomePage> {
                             Provider.of<HomePageModel>(context, listen: false).updateOption(value);
                           },
                         ))
-                    .toList(),
+                    ,
               ],
             ),
           AppStyles.fieldSpacing,
