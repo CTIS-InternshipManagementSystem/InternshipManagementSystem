@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'services/user_service.dart';
 import 'submission_detail_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -18,20 +17,104 @@ class SearchPage extends StatefulWidget {
 }
 
 class _SearchPageState extends State<SearchPage> {
+  String? _selectedOption;
   final TextEditingController _bilkentIdController = TextEditingController();
-  final UserService _userService = UserService();
-  Map<String, dynamic>? _studentInfo;
+  String? _uploadFilePath;
+  Uint8List? _uploadFileBytes;
 
-  Future<void> _searchStudent() async {
+  // Dummy data for student submissions
+  final List<Map<String, String>> _studentSubmissions = [
+    {
+      'semester': '2022-2023 Fall',
+      'course': 'CTIS310',
+      'studentName': 'John Doe',
+      'bilkentId': '1110001',
+      'lecturerName': 'Dr. Smith',
+      'submissionStatus': 'Submitted',
+      'companyEvaluation': 'Uploaded'
+    },
+    {
+      'semester': '2022-2023 Fall',
+      'course': 'CTIS290',
+      'studentName': 'Jane Doe',
+      'bilkentId': '1110002',
+      'lecturerName': 'Dr. Brown',
+      'submissionStatus': 'Not Submitted',
+      'companyEvaluation': 'Not Uploaded'
+    },
+  ];
+
+  List<Map<String, String>> _filteredSubmissions = [];
+
+  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredSubmissions = _studentSubmissions;
+  }
+
+  void _searchSubmissions() {
     final bilkentId = _bilkentIdController.text;
-    final studentInfo = await _userService.getStudentInfo(bilkentId);
     setState(() {
-      _studentInfo = studentInfo;
+      _filteredSubmissions = _studentSubmissions
+          .where((submission) => submission['bilkentId'] == bilkentId)
+          .toList();
     });
-    if (studentInfo != null) {
-      print('Student found: ${studentInfo['name']}');
-    } else {
-      print('Student not found');
+  }
+
+  void _updateFilteredSubmissions() {
+    setState(() {
+      _filteredSubmissions = _studentSubmissions;
+    });
+  }
+
+  Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
+    try {
+      await Firebase.initializeApp();
+      String fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
+      final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+      Reference storageRef;
+      if (kIsWeb) {
+        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
+        final destination = "$destinationBase/$fileName";
+        storageRef = FirebaseStorage.instance.ref(destination);
+        final uploadTask = storageRef.putData(fileBytes);
+        final snapshot = await uploadTask.whenComplete(() => null);
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        print("Dosya başarıyla yüklendi: $downloadUrl");
+      } else {
+        final file = File(filePath!);
+        final destination = "$destinationBase/$fileName";
+        storageRef = FirebaseStorage.instance.ref(destination);
+        final uploadTask = storageRef.putFile(file);
+        final snapshot = await uploadTask.whenComplete(() => null);
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        print("Dosya başarıyla yüklendi: $downloadUrl");
+      }
+    } catch (e) {
+      print("Dosya yükleme sırasında bir hata oluştu: $e");
+    }
+  }
+
+  Future<void> downloadFile(String fileName) async {
+    try {
+      final String destination = "$destinationBase/$fileName";
+      final ref = FirebaseStorage.instance.ref(destination);
+      final downloadUrl = await ref.getDownloadURL();
+      if (kIsWeb) {
+        html.AnchorElement anchor = html.AnchorElement(href: downloadUrl);
+        anchor.download = fileName;
+        anchor.click();
+      } else {
+        final response = await http.get(Uri.parse(downloadUrl));
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final File file = File('${appDocDir.path}/$fileName');
+        await file.writeAsBytes(response.bodyBytes);
+        print("File downloaded to: ${file.path}");
+      }
+    } catch (e) {
+      print("Download error: $e");
     }
   }
 
@@ -47,6 +130,34 @@ class _SearchPageState extends State<SearchPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Select an option:',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            RadioListTile<String>(
+              title: const Text('Search Student'),
+              value: 'Search Student',
+              groupValue: _selectedOption,
+              onChanged: (value) {
+                setState(() {
+                  _selectedOption = value;
+                  _updateFilteredSubmissions();
+                });
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Uploading Company Evaluation Reports'),
+              value: 'Uploading Company Evaluation Reports',
+              groupValue: _selectedOption,
+              onChanged: (value) {
+                setState(() {
+                  _selectedOption = value;
+                  _updateFilteredSubmissions();
+                });
+              },
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _bilkentIdController,
               decoration: const InputDecoration(
@@ -57,20 +168,180 @@ class _SearchPageState extends State<SearchPage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _searchStudent,
-              child: const Text('Search Student'),
+              onPressed: _searchSubmissions,
+              child: const Text('Search Student Submissions'),
             ),
             const SizedBox(height: 16),
-            if (_studentInfo != null) ...[
-              Text('Name: ${_studentInfo!['name']}'),
-              Text('Bilkent ID: ${_studentInfo!['bilkentId']}'),
-              Text('Email: ${_studentInfo!['email']}'),
-              const SizedBox(height: 16),
-              Text('Active Courses:'),
-              ..._studentInfo!['activeCourses'].map<Widget>((course) {
-                return Text('Course ID: ${course['courseId']}');
-              }).toList(),
-            ],
+            Expanded(
+              child: ListView.builder(
+                itemCount: _filteredSubmissions.length,
+                itemBuilder: (context, index) {
+                  final submission = _filteredSubmissions[index];
+                  return Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Semester: ${submission['semester']}'),
+                          const SizedBox(height: 4),
+                          Text('Course: ${submission['course']}'),
+                          const SizedBox(height: 4),
+                          Text('Student Name: ${submission['studentName']}'),
+                          const SizedBox(height: 4),
+                          Text('Bilkent ID: ${submission['bilkentId']}'),
+                          const SizedBox(height: 4),
+                          Text('Lecturer Name: ${submission['lecturerName']}'),
+                          const SizedBox(height: 4),
+                          Text('Submission Status: ${submission['submissionStatus']}'),
+                          const SizedBox(height: 16),
+                          if (_selectedOption == 'Uploading Company Evaluation Reports') ...[
+                            if (submission['companyEvaluation'] == 'Uploaded') ...[
+                              ElevatedButton(
+                                onPressed: () {
+                                  downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
+                                },
+                                child: const Text('Download Company Evaluation Report'),
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed: () {
+                                  // Implement delete logic
+                                },
+                                child: const Text('Delete Company Evaluation Report'),
+                              ),
+                            ] else ...[
+                              ElevatedButton(
+                                onPressed: () async {
+                                  if (kIsWeb) {
+                                    FilePickerResult? result = await FilePicker.platform.pickFiles();
+                                    if (result != null) {
+                                      setState(() {
+                                        _uploadFileBytes = result.files.single.bytes;
+                                        _uploadFilePath = result.files.single.name;
+                                      });
+                                    }
+                                  } else {
+                                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                                    if (result != null) {
+                                      setState(() {
+                                        _uploadFilePath = result.files.single.path;
+                                      });
+                                    }
+                                  }
+                                },
+                                child: const Text('Choose File'),
+                              ),
+                              if (_uploadFilePath != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text('Seçilen dosya: $_uploadFilePath'),
+                                ),
+                              const SizedBox(height: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  if (kIsWeb) {
+                                    if (_uploadFileBytes != null) {
+                                      try {
+                                        await uploadFile(fileBytes: _uploadFileBytes);
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Success"),
+                                            content: const Text("File uploaded successfully."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Error"),
+                                            content: const Text("File not uploaded."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text("Error"),
+                                          content: const Text("No file selected."),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    if (_uploadFilePath != null) {
+                                      try {
+                                        await uploadFile(filePath: _uploadFilePath);
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Success"),
+                                            content: const Text("File uploaded successfully."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text("Error"),
+                                            content: const Text("File not uploaded."),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text("Error"),
+                                          content: const Text("No file selected."),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Text('Upload'),
+                              ),
+                            ],
+                          ],
+                          if (_selectedOption == 'Search Student') ...[
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => SubmissionDetailPage(submission: submission)),
+                                );
+                              },
+                              child: const Text('View Submission'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

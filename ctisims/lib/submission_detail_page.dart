@@ -21,8 +21,7 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
   String? _uploadFilePath;
   Uint8List? _uploadFileBytes;
 
-  final String destinationBase =
-      "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
 
   Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
     try {
@@ -30,8 +29,7 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
       String fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
       Reference storageRef;
       if (kIsWeb) {
-        if (fileBytes == null)
-          throw Exception("No file bytes provided for web upload");
+        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
         final uploadTask = storageRef.putData(fileBytes);
@@ -137,9 +135,7 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
                   if (widget.submission['companyEvaluation'] == 'Uploaded') ...[
                     ElevatedButton(
                       onPressed: () {
-                        downloadFile(
-                          "CompanyEvaluation_22002357_Bilgehan_Demirkaya",
-                        );
+                        downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
                       },
                       child: const Text('Download Company Evaluation Report'),
                     ),
@@ -154,19 +150,16 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
                     ElevatedButton(
                       onPressed: () async {
                         if (kIsWeb) {
-                          FilePickerResult? result =
-                              await FilePicker.platform.pickFiles();
-                          if (result != null) {
+                          FilePickerResult? result = await FilePicker.platform.pickFiles();
+                          if(result != null) {
                             setState(() {
                               _uploadFileBytes = result.files.single.bytes;
-                              _uploadFilePath =
-                                  result.files.single.name; // display file name
+                              _uploadFilePath = result.files.single.name; // display file name
                             });
                           }
                         } else {
-                          FilePickerResult? result = await FilePicker.platform
-                              .pickFiles(type: FileType.any);
-                          if (result != null) {
+                          FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                          if(result != null) {
                             setState(() {
                               _uploadFilePath = result.files.single.path;
                             });
@@ -189,52 +182,30 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
                               await uploadFile(fileBytes: _uploadFileBytes);
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Success"),
-                                      content: const Text(
-                                        "File uploaded successfully.",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Success"),
+                                  content: const Text("File uploaded successfully."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             } catch (e) {
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Error"),
-                                      content: const Text("File not uploaded."),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Error"),
+                                  content: const Text("File not uploaded."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             }
                           } else {
                             showDialog(
                               context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text("Error"),
-                                    content: const Text("No file selected."),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text("OK"),
-                                      ),
-                                    ],
-                                  ),
+                              builder: (context) => AlertDialog(
+                                title: const Text("Error"),
+                                content: const Text("No file selected."),
+                                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                              ),
                             );
                           }
                         } else {
@@ -243,52 +214,30 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
                               await uploadFile(filePath: _uploadFilePath);
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Success"),
-                                      content: const Text(
-                                        "File uploaded successfully.",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Success"),
+                                  content: const Text("File uploaded successfully."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             } catch (e) {
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Error"),
-                                      content: const Text("File not uploaded."),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Error"),
+                                  content: const Text("File not uploaded."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             }
                           } else {
                             showDialog(
                               context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text("Error"),
-                                    content: const Text("No file selected."),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text("OK"),
-                                      ),
-                                    ],
-                                  ),
+                              builder: (context) => AlertDialog(
+                                title: const Text("Error"),
+                                content: const Text("No file selected."),
+                                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                              ),
                             );
                           }
                         }
@@ -311,9 +260,7 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SizedBox(
-          width:
-              MediaQuery.of(context).size.width -
-              50, // Full width minus margins
+          width: MediaQuery.of(context).size.width - 50, // Full width minus margins
           child: child,
         ),
       ),
@@ -327,7 +274,10 @@ class _SubmissionDetailPageState extends State<SubmissionDetailPage> {
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {

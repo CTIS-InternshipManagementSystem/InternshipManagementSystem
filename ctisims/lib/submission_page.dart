@@ -5,7 +5,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'services/submission_service.dart';
 
 class SubmissionPage extends StatefulWidget {
   final String course;
@@ -30,22 +29,18 @@ class _SubmissionPageState extends State<SubmissionPage> {
     'Follow Up3',
     'Follow Up4',
     'Follow Up5',
-    'Reports about an internship',
+    'Reports about an internship'
   ];
-
-  final SubmissionService _submissionService = SubmissionService();
 
   Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
     try {
       await Firebase.initializeApp();
       // Use a fixed file name for report submission, customize as needed.
       String fileName = "CompanyEvaluationForm_22002357_Bilgehan_Demirkaya";
-      final String destinationBase =
-          "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+      final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
       Reference storageRef;
       if (kIsWeb) {
-        if (fileBytes == null)
-          throw Exception("No file bytes provided for web upload");
+        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
         final uploadTask = storageRef.putData(fileBytes);
@@ -66,44 +61,9 @@ class _SubmissionPageState extends State<SubmissionPage> {
     }
   }
 
-  Future<void> submit310(
-    String bilkentId,
-    String comments,
-    String assignment,
-  ) async {
-    final status = await _submissionService.submit310(
-      bilkentId,
-      comments,
-      assignment,
-    );
-    if (status == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Submission successful')));
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Submission failed')));
-    }
-  }
-
-  Future<void> submit290(String bilkentId, String comments) async {
-    final status = await _submissionService.submit290(bilkentId, comments);
-    if (status == 200) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Submission successful')));
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Submission failed')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final List<String> options =
-        widget.course == 'CTIS290' ? _ctis290Options : _ctis310Options;
+    final List<String> options = widget.course == 'CTIS290' ? _ctis290Options : _ctis310Options;
 
     return Scaffold(
       appBar: AppBar(
@@ -159,22 +119,16 @@ class _SubmissionPageState extends State<SubmissionPage> {
                       ElevatedButton(
                         onPressed: () async {
                           if (kIsWeb) {
-                            FilePickerResult? result =
-                                await FilePicker.platform.pickFiles();
+                            FilePickerResult? result = await FilePicker.platform.pickFiles();
                             if (result != null) {
                               setState(() {
                                 _uploadFileBytes = result.files.single.bytes;
-                                _uploadFilePath =
-                                    result
-                                        .files
-                                        .single
-                                        .name; // display file name
+                                _uploadFilePath = result.files.single.name; // display file name
                               });
                               // Removed immediate uploadFile call and alert.
                             }
                           } else {
-                            FilePickerResult? result = await FilePicker.platform
-                                .pickFiles(type: FileType.any);
+                            FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
                             if (result != null) {
                               setState(() {
                                 _uploadFilePath = result.files.single.path;
@@ -202,19 +156,18 @@ class _SubmissionPageState extends State<SubmissionPage> {
                       const SizedBox(height: 8),
                       // New radio button group for selecting the report type
                       Column(
-                        children:
-                            options.map((option) {
-                              return RadioListTile<String>(
-                                title: Text(option),
-                                value: option,
-                                groupValue: _selectedOption,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedOption = value;
-                                  });
-                                },
-                              );
-                            }).toList(),
+                        children: options.map((option) {
+                          return RadioListTile<String>(
+                            title: Text(option),
+                            value: option,
+                            groupValue: _selectedOption,
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedOption = value;
+                              });
+                            },
+                          );
+                        }).toList(),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton(
@@ -225,55 +178,30 @@ class _SubmissionPageState extends State<SubmissionPage> {
                                 await uploadFile(fileBytes: _uploadFileBytes);
                                 showDialog(
                                   context: context,
-                                  builder:
-                                      (context) => AlertDialog(
-                                        title: const Text("Success"),
-                                        content: const Text(
-                                          "File uploaded successfully.",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(context),
-                                            child: const Text("OK"),
-                                          ),
-                                        ],
-                                      ),
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Success"),
+                                    content: const Text("File uploaded successfully."),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                  ),
                                 );
                               } catch (e) {
                                 showDialog(
                                   context: context,
-                                  builder:
-                                      (context) => AlertDialog(
-                                        title: const Text("Error"),
-                                        content: const Text(
-                                          "File not uploaded.",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(context),
-                                            child: const Text("OK"),
-                                          ),
-                                        ],
-                                      ),
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Error"),
+                                    content: const Text("File not uploaded."),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                  ),
                                 );
                               }
                             } else {
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Error"),
-                                      content: const Text("No file selected."),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Error"),
+                                  content: const Text("No file selected."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             }
                           } else {
@@ -282,71 +210,32 @@ class _SubmissionPageState extends State<SubmissionPage> {
                                 await uploadFile(filePath: _uploadFilePath);
                                 showDialog(
                                   context: context,
-                                  builder:
-                                      (context) => AlertDialog(
-                                        title: const Text("Success"),
-                                        content: const Text(
-                                          "File uploaded successfully.",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(context),
-                                            child: const Text("OK"),
-                                          ),
-                                        ],
-                                      ),
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Success"),
+                                    content: const Text("File uploaded successfully."),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                  ),
                                 );
                               } catch (e) {
                                 showDialog(
                                   context: context,
-                                  builder:
-                                      (context) => AlertDialog(
-                                        title: const Text("Error"),
-                                        content: const Text(
-                                          "File not uploaded.",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(context),
-                                            child: const Text("OK"),
-                                          ),
-                                        ],
-                                      ),
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Error"),
+                                    content: const Text("File not uploaded."),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                  ),
                                 );
                               }
                             } else {
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Error"),
-                                      content: const Text("No file selected."),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("OK"),
-                                        ),
-                                      ],
-                                    ),
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Error"),
+                                  content: const Text("No file selected."),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                                ),
                               );
                             }
-                          }
-
-                          // Submit the assignment
-                          final bilkentId = '22002357'; // Example Bilkent ID
-                          final comments = _commentController.text;
-                          if (widget.course == 'CTIS310' &&
-                              _selectedOption != null) {
-                            await submit310(
-                              bilkentId,
-                              comments,
-                              _selectedOption!,
-                            );
-                          } else if (widget.course == 'CTIS290') {
-                            await submit290(bilkentId, comments);
                           }
                         },
                         child: const Text('Upload'),
@@ -356,6 +245,8 @@ class _SubmissionPageState extends State<SubmissionPage> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              
             ],
           ),
         ),

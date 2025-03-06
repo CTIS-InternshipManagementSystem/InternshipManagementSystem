@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -20,7 +22,9 @@ class MyApp extends StatelessWidget {
       create: (_) => HomePageModel(), // Provide HomePageModel at the top level
       child: MaterialApp(
         title: 'CTIS IMS',
-        theme: ThemeData(primarySwatch: Colors.blue),
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
         home: const LoginPage(),
       ),
     );
