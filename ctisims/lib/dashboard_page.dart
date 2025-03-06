@@ -34,31 +34,36 @@ class _DashboardPageState extends State<DashboardPage> {
   // Apply search and all filters
   void _applyFilters() {
     setState(() {
-      filteredSemesters = widget.registeredSemesters.where((semester) {
-        bool matches = true;
-        // Search filter (course name)
-        if (searchQuery.isNotEmpty) {
-          matches = matches &&
-              (semester['course']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
-        }
-        // Role filter
-        if (roleFilter != "All") {
-          matches = matches && (semester['role'] == roleFilter);
-        }
-        // Year filter
-        if (yearFilter != "All") {
-          matches = matches && (semester['year'] == yearFilter);
-        }
-        // Semester filter
-        if (semesterFilter != "All") {
-          matches = matches && (semester['semester'] == semesterFilter);
-        }
-        // Course filter
-        if (courseFilter != "All") {
-          matches = matches && (semester['course'] == courseFilter);
-        }
-        return matches;
-      }).toList();
+      filteredSemesters =
+          widget.registeredSemesters.where((semester) {
+            bool matches = true;
+            // Search filter (course name)
+            if (searchQuery.isNotEmpty) {
+              matches =
+                  matches &&
+                  (semester['course']?.toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      ) ??
+                      false);
+            }
+            // Role filter
+            if (roleFilter != "All") {
+              matches = matches && (semester['role'] == roleFilter);
+            }
+            // Year filter
+            if (yearFilter != "All") {
+              matches = matches && (semester['year'] == yearFilter);
+            }
+            // Semester filter
+            if (semesterFilter != "All") {
+              matches = matches && (semester['semester'] == semesterFilter);
+            }
+            // Course filter
+            if (courseFilter != "All") {
+              matches = matches && (semester['course'] == courseFilter);
+            }
+            return matches;
+          }).toList();
       _sortSemesters();
     });
   }
@@ -75,27 +80,33 @@ class _DashboardPageState extends State<DashboardPage> {
       switch (sortOption) {
         case "Year Ascending":
           filteredSemesters.sort(
-              (a, b) => (a['year'] ?? "").compareTo(b['year'] ?? ""));
+            (a, b) => (a['year'] ?? "").compareTo(b['year'] ?? ""),
+          );
           break;
         case "Year Descending":
           filteredSemesters.sort(
-              (a, b) => (b['year'] ?? "").compareTo(a['year'] ?? ""));
+            (a, b) => (b['year'] ?? "").compareTo(a['year'] ?? ""),
+          );
           break;
         case "Semester Ascending":
-          filteredSemesters.sort((a, b) =>
-              (a['semester'] ?? "").compareTo(b['semester'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (a['semester'] ?? "").compareTo(b['semester'] ?? ""),
+          );
           break;
         case "Semester Descending":
-          filteredSemesters.sort((a, b) =>
-              (b['semester'] ?? "").compareTo(a['semester'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (b['semester'] ?? "").compareTo(a['semester'] ?? ""),
+          );
           break;
         case "Course Ascending":
           filteredSemesters.sort(
-              (a, b) => (a['course'] ?? "").compareTo(b['course'] ?? ""));
+            (a, b) => (a['course'] ?? "").compareTo(b['course'] ?? ""),
+          );
           break;
         case "Course Descending":
           filteredSemesters.sort(
-              (a, b) => (b['course'] ?? "").compareTo(a['course'] ?? ""));
+            (a, b) => (b['course'] ?? "").compareTo(a['course'] ?? ""),
+          );
           break;
         default:
           break;
@@ -130,12 +141,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 DropdownButtonFormField<String>(
                   value: tempRole,
                   decoration: const InputDecoration(labelText: "Role"),
-                  items: ["All", "Student", "Admin"].map((value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+                  items:
+                      ["All", "Student", "Admin"].map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
                   onChanged: (val) {
                     tempRole = val!;
                   },
@@ -145,12 +157,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 DropdownButtonFormField<String>(
                   value: tempYear,
                   decoration: const InputDecoration(labelText: "Year"),
-                  items: years.map((value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+                  items:
+                      years.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
                   onChanged: (val) {
                     tempYear = val!;
                   },
@@ -160,12 +173,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 DropdownButtonFormField<String>(
                   value: tempSemester,
                   decoration: const InputDecoration(labelText: "Semester"),
-                  items: ["All", "Fall", "Spring"].map((value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+                  items:
+                      ["All", "Fall", "Spring"].map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
                   onChanged: (val) {
                     tempSemester = val!;
                   },
@@ -175,12 +189,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 DropdownButtonFormField<String>(
                   value: tempCourse,
                   decoration: const InputDecoration(labelText: "Course"),
-                  items: courses.map((value) {
-                    return DropdownMenuItem(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+                  items:
+                      courses.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
                   onChanged: (val) {
                     tempCourse = val!;
                   },
@@ -250,16 +265,24 @@ class _DashboardPageState extends State<DashboardPage> {
             },
             icon: Icon(darkMode ? Icons.dark_mode : Icons.light_mode),
           ),
-          if (widget.registeredSemesters.any((semester) => semester['role'] == 'Admin')) ...[
+          if (widget.registeredSemesters.any(
+            (semester) => semester['role'] == 'Admin',
+          )) ...[
             TextButton(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => ExportPage(semesters: widget.registeredSemesters)),
+                    builder:
+                        (context) =>
+                            ExportPage(semesters: widget.registeredSemesters),
+                  ),
                 );
               },
-              child: const Text('Statistics & Grades', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Statistics & Grades',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -268,7 +291,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   MaterialPageRoute(builder: (context) => const SearchPage()),
                 );
               },
-              child: const Text('Search', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Search',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ],
@@ -301,7 +327,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: textColor.withOpacity(0.4)),
+                          borderSide: BorderSide(
+                            color: textColor.withOpacity(0.4),
+                          ),
                         ),
                       ),
                     ),
@@ -321,19 +349,23 @@ class _DashboardPageState extends State<DashboardPage> {
                         DropdownButton<String>(
                           value: sortOption,
                           dropdownColor: cardBgColor,
-                          items: <String>[
-                            "Year Ascending",
-                            "Year Descending",
-                            "Semester Ascending",
-                            "Semester Descending",
-                            "Course Ascending",
-                            "Course Descending"
-                          ].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value, style: TextStyle(color: textColor)),
-                            );
-                          }).toList(),
+                          items:
+                              <String>[
+                                "Year Ascending",
+                                "Year Descending",
+                                "Semester Ascending",
+                                "Semester Descending",
+                                "Course Ascending",
+                                "Course Descending",
+                              ].map((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(
+                                    value,
+                                    style: TextStyle(color: textColor),
+                                  ),
+                                );
+                              }).toList(),
                           onChanged: (String? newValue) {
                             if (newValue != null) {
                               setState(() {
@@ -371,9 +403,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     itemBuilder: (context, index) {
                       final semester = filteredSemesters[index];
                       final role = semester['role'] ?? 'Student';
-                      final String buttonText = role == 'Student'
-                          ? 'View Submission'
-                          : 'Evaluate Submission';
+                      final String buttonText =
+                          role == 'Student'
+                              ? 'View Submission'
+                              : 'Evaluate Submission';
                       return Card(
                         color: cardBgColor,
                         elevation: 4,
@@ -386,27 +419,26 @@ class _DashboardPageState extends State<DashboardPage> {
                             children: [
                               // Top Row: Year (left) and Semester (right)
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     semester['year'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: textColor,
-                                        ),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
                                   ),
                                   Text(
                                     semester['semester'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: textColor,
-                                        ),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -415,13 +447,12 @@ class _DashboardPageState extends State<DashboardPage> {
                               Center(
                                 child: Text(
                                   semester['course'] ?? '',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor,
-                                      ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
                                 ),
                               ),
                               const Spacer(),
@@ -434,21 +465,28 @@ class _DashboardPageState extends State<DashboardPage> {
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                   ),
                                   onPressed: () {
                                     if (role == 'Student') {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => SubmissionPage(course: semester['course']!),
+                                          builder:
+                                              (context) => SubmissionPage(
+                                                course: semester['course']!,
+                                              ),
                                         ),
                                       );
                                     } else if (role == 'Admin') {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const AssignedSubmissionsPage(),
+                                          builder:
+                                              (context) =>
+                                                  const AssignedSubmissionsPage(),
                                         ),
                                       );
                                     }

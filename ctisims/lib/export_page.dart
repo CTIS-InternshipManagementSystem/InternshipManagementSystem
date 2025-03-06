@@ -39,10 +39,11 @@ class _ExportPageState extends State<ExportPage> {
   void updateSearch(String query) {
     setState(() {
       searchQuery = query;
-      filteredSemesters = widget.semesters.where((semester) {
-        final course = (semester['course'] ?? "").toLowerCase();
-        return course.contains(query.toLowerCase());
-      }).toList();
+      filteredSemesters =
+          widget.semesters.where((semester) {
+            final course = (semester['course'] ?? "").toLowerCase();
+            return course.contains(query.toLowerCase());
+          }).toList();
     });
   }
 
@@ -115,7 +116,9 @@ class _ExportPageState extends State<ExportPage> {
                       return Card(
                         elevation: AppStyles.cardElevation,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppStyles.borderRadius,
+                          ),
                         ),
                         child: Padding(
                           padding: AppStyles.padding,
@@ -124,20 +127,17 @@ class _ExportPageState extends State<ExportPage> {
                             children: [
                               // Header: Year (left) and Semester (right)
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     semester['year'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
+                                    style: Theme.of(context).textTheme.bodyLarge
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     semester['semester'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
+                                    style: Theme.of(context).textTheme.bodyLarge
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -161,38 +161,54 @@ class _ExportPageState extends State<ExportPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _gradesLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _gradesLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
+                                      onPressed:
+                                          _gradesLoading[index] == true
+                                              ? null
+                                              : () async {
                                                 setState(() {
-                                                  _gradesLoading[index] = false;
+                                                  _gradesLoading[index] = true;
                                                 });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Grades exported successfully")),
-                                                );
-                                              });
-                                            },
-                                      icon: _gradesLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.grade),
+                                                await simulateExport(() {
+                                                  setState(() {
+                                                    _gradesLoading[index] =
+                                                        false;
+                                                  });
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Grades exported successfully",
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                      icon:
+                                          _gradesLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                              : const Icon(Icons.grade),
                                       label: const Text("Export Grades"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -201,38 +217,55 @@ class _ExportPageState extends State<ExportPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _statisticsLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _statisticsLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
+                                      onPressed:
+                                          _statisticsLoading[index] == true
+                                              ? null
+                                              : () async {
                                                 setState(() {
-                                                  _statisticsLoading[index] = false;
+                                                  _statisticsLoading[index] =
+                                                      true;
                                                 });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Statistics exported successfully")),
-                                                );
-                                              });
-                                            },
-                                      icon: _statisticsLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.bar_chart),
+                                                await simulateExport(() {
+                                                  setState(() {
+                                                    _statisticsLoading[index] =
+                                                        false;
+                                                  });
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Statistics exported successfully",
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                      icon:
+                                          _statisticsLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                              : const Icon(Icons.bar_chart),
                                       label: const Text("Export Stats"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -241,38 +274,55 @@ class _ExportPageState extends State<ExportPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _submissionsLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _submissionsLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
+                                      onPressed:
+                                          _submissionsLoading[index] == true
+                                              ? null
+                                              : () async {
                                                 setState(() {
-                                                  _submissionsLoading[index] = false;
+                                                  _submissionsLoading[index] =
+                                                      true;
                                                 });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Submissions exported successfully")),
-                                                );
-                                              });
-                                            },
-                                      icon: _submissionsLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.file_download),
+                                                await simulateExport(() {
+                                                  setState(() {
+                                                    _submissionsLoading[index] =
+                                                        false;
+                                                  });
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Submissions exported successfully",
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                      icon:
+                                          _submissionsLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                              : const Icon(Icons.file_download),
                                       label: const Text("Export Submissions"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -281,38 +331,55 @@ class _ExportPageState extends State<ExportPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _deactivateLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _deactivateLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
+                                      onPressed:
+                                          _deactivateLoading[index] == true
+                                              ? null
+                                              : () async {
                                                 setState(() {
-                                                  _deactivateLoading[index] = false;
+                                                  _deactivateLoading[index] =
+                                                      true;
                                                 });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Semester deactivated")),
-                                                );
-                                              });
-                                            },
-                                      icon: _deactivateLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.cancel),
+                                                await simulateExport(() {
+                                                  setState(() {
+                                                    _deactivateLoading[index] =
+                                                        false;
+                                                  });
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Semester deactivated",
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                      icon:
+                                          _deactivateLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                              : const Icon(Icons.cancel),
                                       label: const Text("Deactivate"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),

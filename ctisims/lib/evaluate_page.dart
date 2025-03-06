@@ -38,14 +38,16 @@ class _EvaluatePageState extends State<EvaluatePage> {
   // Separate controller for CTIS290 section
   final TextEditingController _ctis290Controller = TextEditingController();
 
-  final TextEditingController _companyEvaluationController = TextEditingController();
+  final TextEditingController _companyEvaluationController =
+      TextEditingController();
 
   String? _filePath;
   Uint8List? _fileBytes;
   bool _isUploading = false;
   bool _isDownloading = false;
 
-  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+  final String destinationBase =
+      "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
 
   // Custom inputFormatters for grade inputs:
   final List<TextInputFormatter> _gradeInputFormatters = [
@@ -61,7 +63,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
       } catch (e) {
         return newValue;
       }
-    })
+    }),
   ];
 
   Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
@@ -73,7 +75,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
       String fileName;
       Reference storageRef;
       if (kIsWeb) {
-        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
+        if (fileBytes == null)
+          throw Exception("No file bytes provided for web upload");
         fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
@@ -96,9 +99,9 @@ class _EvaluatePageState extends State<EvaluatePage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error during file upload: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error during file upload: $e")));
     } finally {
       setState(() {
         _isUploading = false;
@@ -128,9 +131,9 @@ class _EvaluatePageState extends State<EvaluatePage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Download error: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Download error: $e")));
     } finally {
       setState(() {
         _isDownloading = false;
@@ -173,9 +176,11 @@ class _EvaluatePageState extends State<EvaluatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final String studentName = widget.submission['studentName'] ?? 'Demo student';
+    final String studentName =
+        widget.submission['studentName'] ?? 'Demo student';
     final String bilkentId = widget.submission['bilkentId'] ?? '1110002';
-    final String email = widget.submission['email'] ?? 'demo.student@bilkent.edu.tr';
+    final String email =
+        widget.submission['email'] ?? 'demo.student@bilkent.edu.tr';
     final String course = widget.submission['course'] ?? 'CTIS310';
 
     return Scaffold(
@@ -235,9 +240,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
                 _buildCTIS310Section('Reports about an internship'),
               ],
               // CTIS 290 Specific Section
-              if (course == 'CTIS290') ...[
-                _buildCTIS290Section(),
-              ],
+              if (course == 'CTIS290') ...[_buildCTIS290Section()],
               const SizedBox(height: 16),
               // Company Evaluation Section
               Card(
@@ -259,7 +262,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
                         onPressed: () async {
                           // File picker for web and mobile with semantic label
                           if (kIsWeb) {
-                            FilePickerResult? result = await FilePicker.platform.pickFiles();
+                            FilePickerResult? result =
+                                await FilePicker.platform.pickFiles();
                             if (result != null) {
                               setState(() {
                                 _fileBytes = result.files.single.bytes;
@@ -267,7 +271,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
                               });
                             }
                           } else {
-                            FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                            FilePickerResult? result = await FilePicker.platform
+                                .pickFiles(type: FileType.any);
                             if (result != null) {
                               setState(() {
                                 _filePath = result.files.single.path;
@@ -287,40 +292,52 @@ class _EvaluatePageState extends State<EvaluatePage> {
                         ),
                       const SizedBox(height: 8),
                       ElevatedButton(
-                        onPressed: _isUploading
-                            ? null
-                            : () async {
-                                if (kIsWeb) {
-                                  if (_fileBytes != null) {
-                                    await uploadFile(fileBytes: _fileBytes);
+                        onPressed:
+                            _isUploading
+                                ? null
+                                : () async {
+                                  if (kIsWeb) {
+                                    if (_fileBytes != null) {
+                                      await uploadFile(fileBytes: _fileBytes);
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("No file selected."),
+                                        ),
+                                      );
+                                    }
                                   } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("No file selected.")),
-                                    );
+                                    if (_filePath != null) {
+                                      await uploadFile(filePath: _filePath);
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("No file selected."),
+                                        ),
+                                      );
+                                    }
                                   }
-                                } else {
-                                  if (_filePath != null) {
-                                    await uploadFile(filePath: _filePath);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("No file selected.")),
-                                    );
-                                  }
-                                }
-                              },
+                                },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppStyles.buttonColor,
                         ),
-                        child: _isUploading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Upload Company Evaluation'),
+                        child:
+                            _isUploading
+                                ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : const Text('Upload Company Evaluation'),
                       ),
                       const SizedBox(height: 8),
                       Form(
@@ -358,16 +375,15 @@ class _EvaluatePageState extends State<EvaluatePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: () {
                 downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppStyles.buttonColor,
+              ),
               child: Text('Download $title'),
             ),
             const SizedBox(height: 8),
@@ -407,7 +423,9 @@ class _EvaluatePageState extends State<EvaluatePage> {
               onPressed: () {
                 downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppStyles.buttonColor,
+              ),
               child: const Text('Download Report'),
             ),
             const SizedBox(height: 8),

@@ -10,7 +10,6 @@ import 'firebase_keys.dart';
 /// Example:
 /// ```dart
 /// import 'firebase_options.dart';
-/// // ...
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
@@ -68,5 +67,4 @@ class DefaultFirebaseOptions {
     appId: firebaseAppId,
     measurementId: firebaseMeasurementId,
   );
-
 }

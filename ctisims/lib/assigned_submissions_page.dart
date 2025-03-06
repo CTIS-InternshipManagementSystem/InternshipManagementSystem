@@ -5,7 +5,8 @@ class AssignedSubmissionsPage extends StatefulWidget {
   const AssignedSubmissionsPage({super.key});
 
   @override
-  _AssignedSubmissionsPageState createState() => _AssignedSubmissionsPageState();
+  _AssignedSubmissionsPageState createState() =>
+      _AssignedSubmissionsPageState();
 }
 
 class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
@@ -20,9 +21,14 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredSubmissions = _showWithCompanyEvaluation
-        ? _submissions.where((submission) => submission['companyEvaluation'] == 'Uploaded').toList()
-        : _submissions;
+    final filteredSubmissions =
+        _showWithCompanyEvaluation
+            ? _submissions
+                .where(
+                  (submission) => submission['companyEvaluation'] == 'Uploaded',
+                )
+                .toList()
+            : _submissions;
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +43,9 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
             Row(
               children: [
                 Expanded(
-                  child: const Text('Show only with company evaluation form uploaded'),
+                  child: const Text(
+                    'Show only with company evaluation form uploaded',
+                  ),
                 ),
                 Switch(
                   value: _showWithCompanyEvaluation,
@@ -59,12 +67,18 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
                     margin: const EdgeInsets.symmetric(vertical: 8.0),
                     child: ListTile(
                       title: Text(submission['title']!),
-                      subtitle: Text('Company Evaluation: ${submission['companyEvaluation']}'),
+                      subtitle: Text(
+                        'Company Evaluation: ${submission['companyEvaluation']}',
+                      ),
                       trailing: ElevatedButton(
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => EvaluatePage(submission: submission)),
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      EvaluatePage(submission: submission),
+                            ),
                           );
                         },
                         child: const Text('Evaluate'),

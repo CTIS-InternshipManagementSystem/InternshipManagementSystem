@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'services/user_service.dart';
+import 'services/semester_service.dart';
+import 'services/course_service.dart';
+import 'services/deadline_service.dart';
+import 'models/user.dart';
 
 class HomePageModel extends ChangeNotifier {
   String? selectedYear;
@@ -75,6 +80,10 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bilkentIdController = TextEditingController();
+  final UserService _userService = UserService();
+  final SemesterService _semesterService = SemesterService();
+  final CourseService _courseService = CourseService();
+  final DeadlineService _deadlineService = DeadlineService();
 
   final List<String> _years = ['2023', '2024', '2025'];
   final List<String> _semesters = ['Fall', 'Spring'];
@@ -88,15 +97,107 @@ class _HomePageState extends State<HomePage> {
     'Follow Up3',
     'Follow Up4',
     'Follow Up5',
-    'Reports about an internship'
+    'Reports about an internship',
   ];
   final List<String> _supervisors = ['Dr. Smith', 'Dr. Brown', 'Dr. Johnson'];
 
   final List<Map<String, String>> _registeredSemesters = [
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS310', 'role': 'Student'},
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Student'},
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Admin'},
+    {
+      'year': '2022-2023',
+      'semester': 'Fall',
+      'course': 'CTIS310',
+      'role': 'Student',
+    },
+    {
+      'year': '2022-2023',
+      'semester': 'Fall',
+      'course': 'CTIS290',
+      'role': 'Student',
+    },
+    {
+      'year': '2022-2023',
+      'semester': 'Fall',
+      'course': 'CTIS290',
+      'role': 'Admin',
+    },
   ];
+
+  String? _activeSemester;
+  List<Map<String, dynamic>> _teachers = [];
+  List<Map<String, dynamic>> _currentDeadlines = [];
+  List<Map<String, dynamic>> _allCoursesForAdmin = [];
+  Map<String, dynamic>? _activeCourseForStudent;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveSemester();
+    _loadAllCoursesForAdmin();
+    _loadActiveCourseForStudent();
+  }
+
+  Future<void> _loadActiveSemester() async {
+    final activeSemester = await _semesterService.getActiveSemester();
+    if (activeSemester != null) {
+      setState(() {
+        _activeSemester = '${activeSemester.year} ${activeSemester.semester}';
+      });
+      _loadTeachers(activeSemester.id);
+      _loadCurrentDeadlines(activeSemester.id);
+    }
+  }
+
+  Future<void> _loadTeachers(String semesterId) async {
+    final courses = await _courseService.getCoursesBySemester(semesterId);
+    List<Map<String, dynamic>> teachers = [];
+    for (var course in courses) {
+      final courseTeachers = await _userService.getTeachers(course['id']);
+      teachers.addAll(courseTeachers);
+    }
+    setState(() {
+      _teachers = teachers;
+    });
+  }
+
+  Future<void> _loadCurrentDeadlines(String semesterId) async {
+    final courses = await _courseService.getCoursesBySemester(semesterId);
+    List<Map<String, dynamic>> deadlines = [];
+    for (var course in courses) {
+      final courseDeadlines = await _deadlineService.getDeadlinesByCourse(
+        course['id'],
+      );
+      deadlines.addAll(courseDeadlines);
+    }
+    setState(() {
+      _currentDeadlines = deadlines;
+    });
+  }
+
+  Future<void> _loadAllCoursesForAdmin() async {
+    final semesters = await _semesterService.getAllSemesters();
+    List<Map<String, dynamic>> courses = [];
+    for (var semester in semesters) {
+      final semesterCourses = await _courseService.getCoursesBySemester(
+        semester.id,
+      );
+      courses.addAll(semesterCourses);
+    }
+    setState(() {
+      _allCoursesForAdmin = courses;
+    });
+  }
+
+  Future<void> _loadActiveCourseForStudent() async {
+    final activeSemester = await _semesterService.getActiveSemester();
+    if (activeSemester != null) {
+      final courses = await _courseService.getCoursesBySemester(
+        activeSemester.id,
+      );
+      setState(() {
+        _activeCourseForStudent = courses.isNotEmpty ? courses.first : null;
+      });
+    }
+  }
 
   Future<void> _selectDeadlineDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
@@ -131,25 +232,171 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _addUser() async {
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: 'temporaryPassword123',
+      final name = _nameController.text;
+      final email = _emailController.text;
+      final bilkentId = _bilkentIdController.text;
+      final role =
+          Provider.of<HomePageModel>(context, listen: false).selectedRole;
+      final semesterId =
+          Provider.of<HomePageModel>(
+            context,
+            listen: false,
+          ).selectedUserSemester;
+      final supervisor =
+          Provider.of<HomePageModel>(context, listen: false).selectedSupervisor;
+
+      if (role == null || semesterId == null || supervisor == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+        return;
+      }
+
+      final id =
+          DateTime.now().millisecondsSinceEpoch
+              .toString(); // Benzersiz ID oluşturma
+      final status = await _userService.addUser(
+        id,
+        name,
+        email,
+        bilkentId,
+        role,
+        supervisor,
       );
 
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+      if (status == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User added successfully')),
+        );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User added and password reset email sent')),
-      );
+        // Eklenen kullanıcıyı doğrulama
+        final addedUser = await _userService.getUserDetailsByEmail(email);
+        if (addedUser != null) {
+          print(
+            'User added: ${addedUser.name}, ${addedUser.bilkentId}, ${addedUser.role}',
+          );
+        } else {
+          print('Failed to retrieve added user');
+        }
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to add user')));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add user: $e')),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to add user: $e')));
+    }
+  }
+
+  Future<void> _createSemester() async {
+    try {
+      final year =
+          Provider.of<HomePageModel>(context, listen: false).selectedYear;
+      final semester =
+          Provider.of<HomePageModel>(context, listen: false).selectedSemester;
+      final course =
+          Provider.of<HomePageModel>(context, listen: false).selectedCourse;
+
+      if (year == null || semester == null || course == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+        return;
+      }
+
+      final id =
+          DateTime.now().millisecondsSinceEpoch
+              .toString(); // Benzersiz ID oluşturma
+      final status = await _semesterService.createSemester(id, year, semester);
+
+      if (status == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Semester created successfully')),
+        );
+        print(
+          'Semester created: Year: $year, Semester: $semester, Course: $course',
+        );
+        _loadActiveSemester(); // Yeni dönemi yükle
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to create semester')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to create semester: $e')));
+    }
+  }
+
+  Future<void> _changeDeadline() async {
+    try {
+      final course =
+          Provider.of<HomePageModel>(
+            context,
+            listen: false,
+          ).selectedChangeDeadlineCourse;
+      final assignment =
+          Provider.of<HomePageModel>(context, listen: false).selectedOption;
+      final deadline = _deadlineController.text;
+
+      if (course == null || assignment == null || deadline.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+        return;
+      }
+
+      final id =
+          DateTime.now().millisecondsSinceEpoch
+              .toString(); // Benzersiz ID oluşturma
+      final status = await _deadlineService.createDeadline(
+        id,
+        course,
+        assignment,
+        DateTime.parse(deadline),
       );
+
+      if (status == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Deadline changed successfully')),
+        );
+        print(
+          'Deadline changed: Course: $course, Assignment: $assignment, Deadline: $deadline',
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to change deadline')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to change deadline: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Seçili semester'ın geçerli olup olmadığını kontrol et
+    String? selectedUserSemester =
+        _registeredSemesters
+                .map(
+                  (semester) => '${semester['year']} - ${semester['semester']}',
+                )
+                .contains(
+                  Provider.of<HomePageModel>(
+                    context,
+                    listen: false,
+                  ).selectedUserSemester,
+                )
+            ? Provider.of<HomePageModel>(
+              context,
+              listen: false,
+            ).selectedUserSemester
+            : null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS'),
@@ -160,15 +407,24 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DashboardPage(registeredSemesters: _registeredSemesters),
+                  builder:
+                      (context) => DashboardPage(
+                        registeredSemesters: _registeredSemesters,
+                      ),
                 ),
               );
             },
-            child: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: const Text(
+              'Dashboard',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
           TextButton(
             onPressed: () {},
-            child: const Text('Begin (Dr.)', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: const Text(
+              'Begin (Dr.)',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -191,12 +447,29 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               child: Center(
-                child: Text(
-                  'Initialize Semester & Add Users',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 28,
+                child: Column(
+                  children: [
+                    Text(
+                      'Initialize Semester & Add Users',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold, fontSize: 28),
+                    ),
+                    if (_activeSemester != null)
+                      Text(
+                        'Active Semester: $_activeSemester',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                    if (_teachers.isNotEmpty)
+                      Column(
+                        children:
+                            _teachers.map((teacher) {
+                              return Text(
+                                'Teacher: ${teacher['username']}',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              );
+                            }).toList(),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -228,6 +501,20 @@ class _HomePageState extends State<HomePage> {
               buttonText: 'Add User',
               modalContent: _addUserModalContent(),
             ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'All Courses for Admin',
+              headerIcon: Icons.list,
+              buttonText: 'View Courses',
+              modalContent: _allCoursesForAdminModalContent(),
+            ),
+            const SizedBox(height: 16),
+            _buildSectionCard(
+              headerTitle: 'Active Course for Student',
+              headerIcon: Icons.school,
+              buttonText: 'View Active Course',
+              modalContent: _activeCourseForStudentModalContent(),
+            ),
           ],
         ),
       ),
@@ -258,10 +545,9 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 8),
                   Text(
                     headerTitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -282,9 +568,14 @@ class _HomePageState extends State<HomePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppStyles.buttonColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                      borderRadius: BorderRadius.circular(
+                        AppStyles.borderRadius,
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 24,
+                    ),
                   ),
                   child: Text(buttonText),
                 ),
@@ -340,22 +631,23 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             'Current Deadline Settings',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
-          const Text('CTIS 310'),
-          const Text('Follow Up1 - Deadline: 30 days'),
-          const Text('Follow Up2 - Deadline: 60 days'),
-          const Text('Follow Up3 - Deadline: 90 days'),
-          const Text('Follow Up4 - Deadline: 120 days'),
-          const Text('Follow Up5 - Deadline: 150 days'),
-          const Text('Report - Deadline: 180 days'),
-          AppStyles.fieldSpacing,
-          const Text('CTIS 290'),
-          const Text('Report - Deadline: 90 days'),
+          if (_currentDeadlines.isNotEmpty)
+            ..._currentDeadlines.map((deadline) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${deadline['assignmentName']} - Deadline: ${deadline['deadline']}',
+                  ),
+                  AppStyles.fieldSpacing,
+                ],
+              );
+            }).toList(),
           AppStyles.fieldSpacing,
           const Text('Last edited by: Begin (Dr.)'),
           const Text('Last update: May 29th 2023 12:25:06 am'),
@@ -369,7 +661,10 @@ class _HomePageState extends State<HomePage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppStyles.borderRadius),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 24,
+                ),
               ),
               child: const Text('Close'),
             ),
@@ -388,29 +683,45 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             'Change Deadline Settings',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedChangeDeadlineCourse,
+            value:
+                Provider.of<HomePageModel>(
+                  context,
+                  listen: false,
+                ).selectedChangeDeadlineCourse,
             decoration: const InputDecoration(
               labelText: 'Course',
               border: OutlineInputBorder(),
             ),
-            items: _changeDeadlineCourses
-                .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-                .toList(),
+            items:
+                _changeDeadlineCourses
+                    .map(
+                      (course) =>
+                          DropdownMenuItem(value: course, child: Text(course)),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateChangeDeadlineCourse(value);
-              Provider.of<HomePageModel>(context, listen: false).updateOption(null);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateChangeDeadlineCourse(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateOption(null);
             },
           ),
           AppStyles.fieldSpacing,
-          if (Provider.of<HomePageModel>(context).selectedChangeDeadlineCourse != null)
+          if (Provider.of<HomePageModel>(
+                context,
+              ).selectedChangeDeadlineCourse !=
+              null)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -419,17 +730,26 @@ class _HomePageState extends State<HomePage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 AppStyles.fieldSpacing,
-                ...((Provider.of<HomePageModel>(context).selectedChangeDeadlineCourse == 'CTIS 290')
+                ...((Provider.of<HomePageModel>(
+                              context,
+                            ).selectedChangeDeadlineCourse ==
+                            'CTIS 290')
                         ? _ctis290Options
                         : _ctis310Options)
-                    .map((option) => RadioListTile<String>(
-                          title: Text(option),
-                          value: option,
-                          groupValue: Provider.of<HomePageModel>(context).selectedOption,
-                          onChanged: (value) {
-                            Provider.of<HomePageModel>(context, listen: false).updateOption(value);
-                          },
-                        ))
+                    .map(
+                      (option) => RadioListTile<String>(
+                        title: Text(option),
+                        value: option,
+                        groupValue:
+                            Provider.of<HomePageModel>(context).selectedOption,
+                        onChanged: (value) {
+                          Provider.of<HomePageModel>(
+                            context,
+                            listen: false,
+                          ).updateOption(value);
+                        },
+                      ),
+                    )
                     .toList(),
               ],
             ),
@@ -448,14 +768,20 @@ class _HomePageState extends State<HomePage> {
           AppStyles.fieldSpacing,
           ElevatedButton(
             onPressed: () {
-              if (Provider.of<HomePageModel>(context, listen: false).selectedOption == null ||
+              if (Provider.of<HomePageModel>(
+                        context,
+                        listen: false,
+                      ).selectedOption ==
+                      null ||
                   _deadlineController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select an option and set a deadline')));
+                  const SnackBar(
+                    content: Text('Please select an option and set a deadline'),
+                  ),
+                );
                 return;
               }
-              debugPrint('New deadline: ${_deadlineController.text}');
-              debugPrint('Selected option: ${Provider.of<HomePageModel>(context, listen: false).selectedOption}');
+              _changeDeadline();
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
@@ -481,60 +807,94 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             'Create Semester',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedYear,
+            value:
+                Provider.of<HomePageModel>(context, listen: false).selectedYear,
             decoration: const InputDecoration(
               labelText: 'Year',
               border: OutlineInputBorder(),
             ),
-            items: _years
-                .map((year) => DropdownMenuItem(value: year, child: Text(year)))
-                .toList(),
+            items:
+                _years
+                    .map(
+                      (year) =>
+                          DropdownMenuItem(value: year, child: Text(year)),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateYear(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateYear(value);
             },
           ),
           AppStyles.fieldSpacing,
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedSemester,
+            value:
+                Provider.of<HomePageModel>(
+                  context,
+                  listen: false,
+                ).selectedSemester,
             decoration: const InputDecoration(
               labelText: 'Semester',
               border: OutlineInputBorder(),
             ),
-            items: _semesters
-                .map((semester) => DropdownMenuItem(value: semester, child: Text(semester)))
-                .toList(),
+            items:
+                _semesters
+                    .map(
+                      (semester) => DropdownMenuItem(
+                        value: semester,
+                        child: Text(semester),
+                      ),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateSemester(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateSemester(value);
             },
           ),
           AppStyles.fieldSpacing,
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedCourse,
+            value:
+                Provider.of<HomePageModel>(
+                  context,
+                  listen: false,
+                ).selectedCourse,
             decoration: const InputDecoration(
               labelText: 'Course',
               border: OutlineInputBorder(),
             ),
-            items: _courses
-                .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-                .toList(),
+            items:
+                _courses
+                    .map(
+                      (course) =>
+                          DropdownMenuItem(value: course, child: Text(course)),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateCourse(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateCourse(value);
             },
           ),
           AppStyles.fieldSpacing,
           ElevatedButton(
             onPressed: () {
-              debugPrint('Year: ${Provider.of<HomePageModel>(context, listen: false).selectedYear}');
-              debugPrint('Semester: ${Provider.of<HomePageModel>(context, listen: false).selectedSemester}');
-              debugPrint('Course: ${Provider.of<HomePageModel>(context, listen: false).selectedCourse}');
-              Navigator.pop(context);
+              if (formKey.currentState!.validate()) {
+                _createSemester();
+                Navigator.pop(context);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppStyles.buttonColor,
@@ -552,6 +912,25 @@ class _HomePageState extends State<HomePage> {
 
   Widget _addUserModalContent() {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+    // Seçili semester'ın geçerli olup olmadığını kontrol et
+    String? selectedUserSemester =
+        _registeredSemesters
+                .map(
+                  (semester) => '${semester['year']} - ${semester['semester']}',
+                )
+                .contains(
+                  Provider.of<HomePageModel>(
+                    context,
+                    listen: false,
+                  ).selectedUserSemester,
+                )
+            ? Provider.of<HomePageModel>(
+              context,
+              listen: false,
+            ).selectedUserSemester
+            : null;
+
     return Form(
       key: formKey,
       child: Column(
@@ -559,93 +938,144 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             'Add User',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
+
+          // NAME
           TextFormField(
             controller: _nameController,
             decoration: const InputDecoration(
               labelText: 'Name',
               border: OutlineInputBorder(),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter a name';
-              return null;
-            },
+            validator:
+                (value) =>
+                    value == null || value.isEmpty
+                        ? 'Please enter a name'
+                        : null,
           ),
           AppStyles.fieldSpacing,
+
+          // EMAIL
           TextFormField(
             controller: _emailController,
             decoration: const InputDecoration(
               labelText: 'Email',
               border: OutlineInputBorder(),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter an email';
-              return null;
-            },
+            validator:
+                (value) =>
+                    value == null || value.isEmpty
+                        ? 'Please enter an email'
+                        : null,
           ),
           AppStyles.fieldSpacing,
+
+          // BILKENT ID
           TextFormField(
             controller: _bilkentIdController,
             decoration: const InputDecoration(
               labelText: 'Bilkent ID',
               border: OutlineInputBorder(),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter a Bilkent ID';
-              return null;
-            },
+            validator:
+                (value) =>
+                    value == null || value.isEmpty
+                        ? 'Please enter a Bilkent ID'
+                        : null,
           ),
           AppStyles.fieldSpacing,
+
+          // ROLE SELECTION
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedRole,
+            value:
+                Provider.of<HomePageModel>(context, listen: false).selectedRole,
             decoration: const InputDecoration(
               labelText: 'Role',
               border: OutlineInputBorder(),
             ),
-            items: _roles
-                .map((role) => DropdownMenuItem(value: role, child: Text(role)))
-                .toList(),
+            items:
+                _roles
+                    .map(
+                      (role) =>
+                          DropdownMenuItem(value: role, child: Text(role)),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateRole(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateRole(value);
             },
           ),
           AppStyles.fieldSpacing,
+
+          // SEMESTER SELECTION
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedUserSemester,
+            value: selectedUserSemester, // Varsayılan değer
             decoration: const InputDecoration(
               labelText: 'Semester',
               border: OutlineInputBorder(),
             ),
-            items: _registeredSemesters
-                .map((semester) => DropdownMenuItem(
-                      value: '${semester['year']} - ${semester['semester']}',
-                      child: Text('${semester['year']} - ${semester['semester']}'),
-                    ))
-                .toList(),
+            items:
+                _registeredSemesters
+                    .map(
+                      (semester) =>
+                          '${semester['year']} - ${semester['semester']}',
+                    )
+                    .toSet() // Aynı olanları kaldır
+                    .map(
+                      (uniqueSemester) => DropdownMenuItem(
+                        value: uniqueSemester,
+                        child: Text(uniqueSemester),
+                      ),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateUserSemester(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateUserSemester(value);
             },
           ),
           AppStyles.fieldSpacing,
+
+          // SUPERVISOR SELECTION
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedSupervisor,
+            value:
+                Provider.of<HomePageModel>(
+                  context,
+                  listen: false,
+                ).selectedSupervisor,
             decoration: const InputDecoration(
               labelText: 'Supervisor',
               border: OutlineInputBorder(),
             ),
-            items: _supervisors
-                .map((supervisor) => DropdownMenuItem(value: supervisor, child: Text(supervisor)))
-                .toList(),
+            items:
+                _supervisors
+                    .map(
+                      (supervisor) => DropdownMenuItem(
+                        value: supervisor,
+                        child: Text(supervisor),
+                      ),
+                    )
+                    .toList(),
             onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateSupervisor(value);
+              Provider.of<HomePageModel>(
+                context,
+                listen: false,
+              ).updateSupervisor(value);
             },
           ),
           AppStyles.fieldSpacing,
+
+          // SUBMIT BUTTON
           ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
@@ -661,6 +1091,98 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
             child: const Text('Add User'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _allCoursesForAdminModalContent() {
+    return Form(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'All Courses for Admin',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          AppStyles.fieldSpacing,
+          if (_allCoursesForAdmin.isNotEmpty)
+            ..._allCoursesForAdmin.map((course) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Course: ${course['code']} - Semester: ${course['semesterId']}',
+                  ),
+                  AppStyles.fieldSpacing,
+                ],
+              );
+            }).toList(),
+          AppStyles.fieldSpacing,
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppStyles.buttonColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 24,
+                ),
+              ),
+              child: const Text('Close'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activeCourseForStudentModalContent() {
+    return Form(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Active Course for Student',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          AppStyles.fieldSpacing,
+          if (_activeCourseForStudent != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Course: ${_activeCourseForStudent!['code']} - Semester: ${_activeCourseForStudent!['semesterId']}',
+                ),
+                AppStyles.fieldSpacing,
+              ],
+            ),
+          AppStyles.fieldSpacing,
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppStyles.buttonColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 24,
+                ),
+              ),
+              child: const Text('Close'),
+            ),
           ),
         ],
       ),
