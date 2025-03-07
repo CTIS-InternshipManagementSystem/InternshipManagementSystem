@@ -161,6 +161,34 @@ class _EvaluatePageState extends State<EvaluatePage> {
     return null;
   }
 
+  Future<void> submitGrade(String grade, String sectionTitle) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://example.com/submit-grade'), // Replace with your backend URL
+        body: {
+          'studentName': widget.submission['studentName']!,
+          'grade': grade,
+          'sectionTitle': sectionTitle,
+          'course': widget.submission['course']!,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Grade submitted for $sectionTitle')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit grade for $sectionTitle')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error during grade submission: $e')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     for (var controller in _sectionControllers.values) {
@@ -336,6 +364,17 @@ class _EvaluatePageState extends State<EvaluatePage> {
                           validator: _validateGrade,
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          final grade = _companyEvaluationController.text;
+                          submitGrade(grade, "Company Evaluation");
+                        },
+                        child: const Text('Submit Grade'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppStyles.buttonColor,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -381,6 +420,15 @@ class _EvaluatePageState extends State<EvaluatePage> {
               inputFormatters: _gradeInputFormatters,
               validator: _validateGrade,
             ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () {
+                final grade = _getSectionController(title).text;
+                submitGrade(grade, title);
+              },
+              child: const Text('Submit Grade'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
+            ),
           ],
         ),
       ),
@@ -420,6 +468,15 @@ class _EvaluatePageState extends State<EvaluatePage> {
               keyboardType: TextInputType.number,
               inputFormatters: _gradeInputFormatters,
               validator: _validateGrade,
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () {
+                final grade = _ctis290Controller.text;
+                submitGrade(grade, 'Reports about an internship');
+              },
+              child: const Text('Submit Grade'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
             ),
           ],
         ),
