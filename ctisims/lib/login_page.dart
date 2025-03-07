@@ -14,6 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  UserData? userData = null;
 
   bool _obscureText = true;
   bool _isLoading = false;
@@ -52,17 +53,28 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      await DBHelper.login(_emailController.text.trim());
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+      final user = await DBHelper.login(_emailController.text.trim());
+      userData = UserData(
+        bilkentId: user['bilkentId'],
+        username: user['username'],
+        role: user['role'],
       );
-      
+      if (userData == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unexpected error: User data is null.')));
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(userData: userData!),
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login failed: ${e.toString()}')),
       );
-      print('Login is unsuccesful: $e');
+      print('Login is unsuccessful: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -201,4 +213,16 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+}
+
+class UserData {
+  final String bilkentId;
+  final String username;
+  final String role;
+
+  UserData({
+    required this.bilkentId,
+    required this.username,
+    required this.role,
+  });
 }

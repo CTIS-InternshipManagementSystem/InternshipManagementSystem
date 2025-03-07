@@ -1,180 +1,79 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
-import 'package:path/path.dart';
 
 class DBHelper {
-  static Database? _database;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Uygulama başlatılırken veritabanı initialize edilir.
-  static Future<void> init() async {
-    if (_database != null) return;
-    if (kIsWeb) {
-      // Web ortamı için
-      databaseFactory = databaseFactoryFfiWeb;
-    }
+  // Temel Firestore işlemleri
 
-    var databasesPath = await getDatabasesPath();
-    String path = join(databasesPath, 'app_database.db');
-
-    _database = await openDatabase(
-      path,
-      version: 1,
-      onConfigure: (db) async {
-        // Foreign key kontrollerini aktif ediyoruz.
-        await db.execute("PRAGMA foreign_keys = ON");
-      },
-      onCreate: (db, version) async {
-        // Semester tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Semester (
-            id TEXT PRIMARY KEY,
-            year TEXT NOT NULL,
-            semester TEXT NOT NULL,
-            isActive INTEGER NOT NULL
-          )
-        ''');
-
-        // User tablosu (öğrenci, öğretmen, sekretarya gibi roller içeriyor)
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS User (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            bilkentId TEXT NOT NULL,
-            role TEXT NOT NULL,
-            supervisorId TEXT,
-            FOREIGN KEY (supervisorId) REFERENCES User(id)
-          )
-        ''');
-
-        // Insert default user
-        await db.insert('User', {
-          'id': '1',
-          'name': 'Bilgehan',
-          'email': 'bilgehan@example.com',
-          'bilkentId': '22002357',
-          'role': 'Admin'
-        });
-
-        // Course tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Course (
-            id TEXT PRIMARY KEY,
-            code TEXT NOT NULL,
-            semesterId TEXT NOT NULL,
-            teacherId TEXT NOT NULL,
-            FOREIGN KEY (semesterId) REFERENCES Semester(id),
-            FOREIGN KEY (teacherId) REFERENCES User(id)
-          )
-        ''');
-
-        // Assignment tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Assignment (
-            id TEXT PRIMARY KEY,
-            courseId TEXT NOT NULL,
-            name TEXT NOT NULL,
-            deadline TEXT NOT NULL,
-            FOREIGN KEY (courseId) REFERENCES Course(id)
-          )
-        ''');
-
-        // Deadline tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Deadline (
-            id TEXT PRIMARY KEY,
-            courseId TEXT NOT NULL,
-            assignmentName TEXT NOT NULL,
-            deadline TEXT NOT NULL,
-            FOREIGN KEY (courseId) REFERENCES Course(id)
-          )
-        ''');
-
-        // Grade tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Grade (
-            id TEXT PRIMARY KEY,
-            studentId TEXT NOT NULL,
-            courseId TEXT NOT NULL,
-            assignmentId TEXT NOT NULL,
-            grade INTEGER NOT NULL,
-            FOREIGN KEY (studentId) REFERENCES User(id),
-            FOREIGN KEY (assignmentId) REFERENCES Assignment(id)
-          )
-        ''');
-
-        // StudentCourse tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS StudentCourse (
-            id TEXT PRIMARY KEY,
-            studentId TEXT NOT NULL,
-            courseId TEXT NOT NULL,
-            isActive INTEGER NOT NULL,
-            companyEvaluationUploaded INTEGER NOT NULL,
-            FOREIGN KEY (studentId) REFERENCES User(id),
-            FOREIGN KEY (courseId) REFERENCES Course(id)
-          )
-        ''');
-
-        // Submission tablosu
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS Submission (
-            id TEXT PRIMARY KEY,
-            courseId TEXT NOT NULL,
-            studentId TEXT NOT NULL,
-            assignmentId TEXT NOT NULL,
-            comments TEXT NOT NULL,
-            submittedAt TEXT NOT NULL,
-            FOREIGN KEY (studentId) REFERENCES User(id),
-            FOREIGN KEY (assignmentId) REFERENCES Assignment(id)
-          )
-        ''');
-      },
-    );
+  /// Yeni belge ekler ve [DocumentReference] döner.
+  static Future<DocumentReference> insert(String collection, Map<String, dynamic> data) async {
+    return await _firestore.collection(collection).add(data);
   }
 
-  /// ********** Veritabanı CRUD İşlemleri (opsiyonel) **********
-  static Future<int> insert(String table, Map<String, dynamic> data) async {
-    await init();
-    return await _database!.insert(table, data);
+  /// Belirtilen koleksiyondaki tüm belgeleri getirir.
+  static Future<List<Map<String, dynamic>>> query(String collection) async {
+    final QuerySnapshot snapshot = await _firestore.collection(collection).get();
+    return snapshot.docs.map((doc) => {
+      'id': doc.id,
+      ...doc.data() as Map<String, dynamic>,
+    }).toList();
   }
 
-  static Future<List<Map<String, dynamic>>> query(String table) async {
-    await init();
-    return await _database!.query(table);
+  /// Belirtilen belgeyi günceller.
+  static Future<void> update(String collection, String docId, Map<String, dynamic> data) async {
+    await _firestore.collection(collection).doc(docId).update(data);
   }
 
-  static Future<int> update(String table, Map<String, dynamic> data, String where, List<Object?> whereArgs) async {
-    await init();
-    return await _database!.update(table, data, where: where, whereArgs: whereArgs);
+  /// Belirtilen belgeyi siler.
+  static Future<void> delete(String collection, String docId) async {
+    await _firestore.collection(collection).doc(docId).delete();
   }
 
-  static Future<int> delete(String table, String where, List<Object?> whereArgs) async {
-    await init();
-    return await _database!.delete(table, where: where, whereArgs: whereArgs);
-  }
+  // --- Kullanıcı İşlemleri ---
 
-  // POST login: email gönderilir, dönen response içinde role, bilkentId ve username beklenir.
+  /// Login: Email'e göre User koleksiyonundan eşleşen kullanıcıyı getirir.
   static Future<Map<String, dynamic>> login(String email) async {
-    final List<Map<String, dynamic>> users = await query('User');
-    for (var user in users) {
-      if (user['email'] == email) {
-        return {
-          'role': user['role'],
-          'bilkentId': user['bilkentId'],
-          'username': user['name']
-        };
-      }
+    final snapshot = await _firestore
+        .collection('User')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      final user = snapshot.docs.first.data();
+      return {
+        'role': user['role'],
+        'bilkentId': user['bilkentId'],
+        'username': user['name'],
+      };
     }
     throw Exception('Login failed');
   }
 
-  // POST AddUser: Yeni kullanıcı ekler.
-  static Future<void> addUser(String name, String email, String bilkentId, String role, String semester, String supervisor) async {
-    await insert('User', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+  /// Yeni kullanıcı ekler.
+  static Future<void> addUser(String name, String email, String bilkentId, String role, String supervisor) async {
+    // Check if email is unique
+    final emailSnapshot = await _firestore
+        .collection('User')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    if (emailSnapshot.docs.isNotEmpty) {
+      throw Exception('Email already exists');
+    }
+
+    // Check if bilkentId is unique
+    final bilkentIdSnapshot = await _firestore
+        .collection('User')
+        .where('bilkentId', isEqualTo: bilkentId)
+        .limit(1)
+        .get();
+    if (bilkentIdSnapshot.docs.isNotEmpty) {
+      throw Exception('Bilkent ID already exists');
+    }
+
+    // Add new user
+    await _firestore.collection('User').add({
       'name': name,
       'email': email,
       'bilkentId': bilkentId,
@@ -183,179 +82,249 @@ class DBHelper {
     });
   }
 
-  // GET activeSemester: Aktif dönemi döner (örneğin "2024-2023 Fall")
-  static Future<String> getActiveSemester() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'Semester',
-      where: 'isActive = ?',
-      whereArgs: [1],
-    );
-    if (result.isNotEmpty) {
-      final activeSemester = result.first;
-      return '${activeSemester['year']} ${activeSemester['semester']}';
-    }
-    throw Exception('Failed to fetch active semester');
-  }
-
-  // GET Admins: Admin listesini döner
-  static Future<List<Map<String, dynamic>>> getAdmins() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'User',
-      where: 'role = ?',
-      whereArgs: ['admin'],
-    );
-    if (result.isNotEmpty) {
-      return result;
-    }
-    throw Exception('Failed to fetch admin info');
-  }
-
-  // POST createSemester: Yeni dönem ve kurs ekler.
-  static Future<void> createSemester(String year, String semester, int isActive) async {
-    await insert('Semester', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'year': year,
-      'semester': semester,
-      'isActive': isActive,
-    });
-  }
-
-  // POST CheangeDeadlineSettings: Belirli bir kurs ve assignment için deadline değişikliği yapar.
-  static Future<void> changeDeadlineSettings(String courseId, String assignmentName, DateTime deadline) async {
-    await update(
-      'Deadline',
-      {'deadline': deadline.toIso8601String()},
-      'courseId = ? AND assignmentName = ?',
-      [courseId, assignmentName],
-    );
-  }
-
-  // GET CurrentDeadline310: CTIS310 için deadline bilgilerini döner.
-  static Future<List<Map<String, dynamic>>> getCurrentDeadline310() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'Deadline',
-      where: 'courseId = ?',
-      whereArgs: ['310'],
-    );
-    if (result.isNotEmpty) {
-      return result;
-    }
-    throw Exception('Failed to fetch CTIS310 deadline info');
-  }
-
-  // GET CurrentDeadline290: CTIS290 için deadline bilgilerini döner.
-  static Future<List<Map<String, dynamic>>> getCurrentDeadline290() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'Deadline',
-      where: 'courseId = ?',
-      whereArgs: ['290'],
-    );
-    if (result.isNotEmpty) {
-      return result;
-    }
-    throw Exception('Failed to fetch CTIS290 deadline info');
-  }
-
-  // GET allCourses: Tüm kurs bilgilerini döner.
-  static Future<List<Map<String, dynamic>>> getAllCourses() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query('Course');
-    if (result.isNotEmpty) {
-      return result;
-    }
-    throw Exception('Failed to fetch course info');
-  }
-
-  // GET getActiveCourses: Aktif kursları döner.
-  static Future<List<Map<String, dynamic>>> getActiveCourses() async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'Course',
-      where: 'isActive = ?',
-      whereArgs: [1],
-    );
-    if (result.isNotEmpty) {
-      return result;
-    }
-    throw Exception('Failed to fetch active course info');
-  }
-  
-
-  // POST submit310: CTIS310 için öğrenci gönderimi.
-  static Future<void> submit310(String bilkentId, String comments, String assignment) async {
-    await insert('Submission', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'courseId': '310',
-      'studentId': bilkentId,
-      'assignmentId': assignment,
-      'comments': comments,
-      'submittedAt': DateTime.now().toIso8601String(),
-    });
-  }
-
-  // POST submit290: CTIS290 için öğrenci gönderimi.
-  static Future<void> submit290(String bilkentId, String comments, String assignment) async {
-    await insert('Submission', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'courseId': '290',
-      'studentId': bilkentId,
-      'assignmentId': assignment,
-      'comments': comments,
-      'submittedAt': DateTime.now().toIso8601String(),
-    });
-  }
-
-  // GET StudentsfomCourses: Belirli kurs tarih, dönem ve koduna göre öğrencileri döner.
-  static Future<List<Map<String, dynamic>>> getStudentsFromCourses(String courseId) async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'StudentCourse',
-      where: 'courseId = ?',
-      whereArgs: [courseId],
-    );
-    if (result.isNotEmpty) {
-      List<Map<String, dynamic>> students = [];
-      for (var studentCourse in result) {
-        final List<Map<String, dynamic>> user = await _database!.query(
-          'User',
-          where: 'id = ?',
-          whereArgs: [studentCourse['studentId']],
-        );
-        if (user.isNotEmpty) {
-          students.add(user.first);
-        }
-      }
-      return students;
-    }
-    throw Exception('Failed to fetch course students');
-  }
-
-  // GET StudentsInfo: Belirli bir bilkentId için öğrenci bilgilerini döner.
+  /// Belirtilen bilkentId'ye sahip kullanıcıyı getirir.
   static Future<Map<String, dynamic>> getStudentInfo(String bilkentId) async {
-    await init();
-    final List<Map<String, dynamic>> result = await _database!.query(
-      'User',
-      where: 'bilkentId = ?',
-      whereArgs: [bilkentId],
-    );
-    if (result.isNotEmpty) {
-      return result.first;
+    final snapshot = await _firestore
+        .collection('User')
+        .where('bilkentId', isEqualTo: bilkentId)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      return {
+        'id': snapshot.docs.first.id,
+        ...snapshot.docs.first.data() as Map<String, dynamic>,
+      };
     }
     throw Exception('Failed to fetch student info');
   }
 
-  // POST enterGrade: Belirtilen parametrelerle not girilmesini sağlar.
-  static Future<void> enterGrade(
-      String bilkentId,
-      String courseId,
-      String assignmentId,
-      int grade) async {
-    await insert('Grade', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+  // --- Course İşlemleri ---
+
+  /// Tüm kursları getirir.
+  static Future<List<Map<String, dynamic>>> getAllCourses() async {
+    final snapshot = await _firestore.collection('Course').get();
+    if (snapshot.docs.isNotEmpty) {
+      return snapshot.docs.map((doc) => {
+        'id': doc.id,
+        ...doc.data() as Map<String, dynamic>,
+      }).toList();
+    }
+    throw Exception('Failed to fetch course info');
+  }
+
+  /// Aktif (isActive: true) kursları getirir. 
+  static Future<List<Map<String, dynamic>>> getActiveCourses() async {
+    final snapshot = await _firestore
+        .collection('Course')
+        .where('isActive', isEqualTo: true)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      return snapshot.docs.map((doc) => {
+        'id': doc.id,
+        ...doc.data() as Map<String, dynamic>,
+      }).toList();
+    }
+    throw Exception('Failed to fetch active course info');
+  }
+
+  /// Belirtilen courseCode için aktif kursu (Course koleksiyonunda) getirir.
+  static Future<DocumentSnapshot?> getActiveCourseDoc(String code) async {
+    final snapshot = await _firestore
+        .collection('Course')
+        .where('code', isEqualTo: code)
+        .where('isActive', isEqualTo: true)
+        .limit(1)
+        .get();
+        
+    if (snapshot.docs.isNotEmpty) {
+      debugPrint("Found active course with code: $code");
+      return snapshot.docs.first;
+    }
+    
+    debugPrint("No active course found for code: $code. Found ${snapshot.size} courses");
+    
+    // Get all courses for debugging
+    final allCourses = await _firestore.collection('Course').get();
+    debugPrint("All courses (${allCourses.docs.length}):");
+    for (var doc in allCourses.docs) {
+      final data = doc.data();
+      debugPrint("Course: code=${data['code']}, isActive=${data['isActive']}");
+    }
+    
+    return null;
+  }
+
+  /// Kursu pasif hale getirir (isActive: false).
+  static Future<void> deactiveCourse(String courseId) async {
+    await _firestore.collection('Course').doc(courseId).update({'isActive': false});
+  }
+
+  /// Creates a new course and automatically creates assignments.
+  /// Parameters:
+  ///   course: Either "CTIS310" or "CTIS290"
+  ///   year: e.g. "2020-2021", "2022-2023", etc.
+  ///   semester: e.g. "Fall" or "Spring"
+  ///   isActive: should be true when creating a new course.
+  static Future<void> createCourse(String course, String year, String semester, bool isActive) async {
+        // Use numeric course code: if course is "CTIS310", code becomes "310"; if "CTIS290", becomes "290".
+    final String numericCode = course.startsWith("CTIS") ? course.substring(4) : course;
+    //Check is there any isActive true course
+    final QuerySnapshot activeCourses = await _firestore
+        .collection('Course')
+        .where('isActive', isEqualTo: true)
+        .where('code', isEqualTo: numericCode)
+        .get();
+    if (activeCourses.docs.isNotEmpty) {
+      if (isActive)
+        throw Exception("There is already an active course. Deactivate it first.");
+    }
+
+    // Check for duplicate course in the same year and semester.
+    final QuerySnapshot duplicate = await _firestore
+        .collection('Course')
+        .where('year', isEqualTo: year)
+        .where('semester', isEqualTo: semester)
+        .where('code', isEqualTo: numericCode)
+        .get();
+    if (duplicate.docs.isNotEmpty) {
+      throw Exception("A course with code $course for $year $semester already exists.");
+    }
+    // Create a new course document.
+    final DocumentReference newCourse = _firestore.collection('Course').doc();
+    await newCourse.set({
+      'code': numericCode,
+      'year': year,
+      'semester': semester,
+      'isActive': isActive,
+      // Specific courseId assigned as string: "1" for CTIS310, "2" for CTIS290.
+      'courseId': newCourse.id,
+    });
+    // Automatically create assignments for the course.
+    if (numericCode == "290") {
+      // Create Report assignment for CTIS290.
+      final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+      await newAssignment.set({
+        'courseCode': "290",
+        'courseId': newCourse.id,
+        // Deadline: 23 April 2025 at 22:45:00 UTC+3 = UTC 19:45:00.
+        'deadline': Timestamp.fromDate(DateTime.utc(2025, 4, 23, 19, 45, 0)),
+        'name': "Report",
+        'id': newAssignment.id,
+      });
+    } else if (numericCode == "310") {
+      // Create Follow Up 1 assignment for CTIS310.
+      for (int i = 1; i <= 5; i++) {
+        final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+        await newAssignment.set({
+          'courseCode': "310",
+          'courseId': newCourse.id,
+          // Deadline: 30 days apart for each follow up.
+          'deadline': Timestamp.fromDate(DateTime.now().toUtc().add(Duration(days: 20 * i))),
+          'name': "Follow Up $i",
+          'id': newAssignment.id,
+        });        
+      }
+      final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+        await newAssignment.set({
+        'courseCode': "310",
+        'courseId': newCourse.id,
+        // Deadline: 30 days apart for each follow up.
+        'deadline': Timestamp.fromDate(DateTime.now().toUtc().add(Duration(days: 120))),
+        'name': "Report",
+        'id': newAssignment.id,
+      });
+      // Additional assignments (e.g., Follow Up 2, etc.) can be created here if desired.
+    }
+  }
+
+  // --- Assignment İşlemleri ---
+
+  /// Verilen courseCode'e sahip aktif kursu bulup, ilgili Assignment belgesinde
+  /// [assignmentName] eşleşen kaydın deadline'ını günceller.
+  static Future<void> changeDeadlineSettings(String courseCode, String assignmentName, DateTime deadline) async {
+    final courseDoc = await getActiveCourseDoc(courseCode);
+    if (courseDoc == null) {
+      throw Exception('No active course found for code $courseCode');
+    }
+    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final snapshot = await _firestore
+        .collection('Assignment')
+        .where('courseId', isEqualTo: courseId)
+        .where('name', isEqualTo: assignmentName)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      await snapshot.docs.first.reference.update({
+        'deadline': Timestamp.fromDate(deadline),
+      });
+    } else {
+      throw Exception('Failed to find assignment for changing deadline');
+    }
+  }
+
+  /// Aktif kursa ait Assignment'ları getirir.
+  static Future<List<Map<String, dynamic>>> getActiveCourseAssignments(String code) async {
+    final courseDoc = await getActiveCourseDoc(code);
+    if (courseDoc == null) {
+      return [];
+    }
+    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final snapshot = await _firestore
+        .collection('Assignment')
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      return snapshot.docs.map((doc) => {
+        'id': doc.id,
+        ...doc.data() as Map<String, dynamic>,
+      }).toList();
+    }
+    return [];
+  }
+
+  /// Streams current deadlines for CTIS 310.
+  static Stream<List<Map<String, dynamic>>> streamCurrentDeadline310() async* {
+    final courseDoc = await getActiveCourseDoc("310");
+    if (courseDoc == null) {
+      yield [];
+      return;
+    }
+    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    yield* _firestore
+        .collection('Assignment')
+        .where('courseId', isEqualTo: courseId)
+        .where('courseCode', isEqualTo: '310')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => {
+          'id': doc.id,
+          ...doc.data() as Map<String, dynamic>,
+        }).toList());
+  }
+  
+  /// Streams current deadlines for CTIS 290.
+  static Stream<List<Map<String, dynamic>>> streamCurrentDeadline290() async* {
+    final courseDoc = await getActiveCourseDoc("290");
+    if (courseDoc == null) {
+      yield [];
+      return;
+    }
+    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    yield* _firestore
+        .collection('Assignment')
+        .where('courseId', isEqualTo: courseId)
+        .where('courseCode', isEqualTo: '290')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => {
+          'id': doc.id,
+          ...doc.data() as Map<String, dynamic>,
+        }).toList());
+  }
+
+  // --- Grade İşlemleri ---
+
+  /// Yeni not ekler (Grade koleksiyonu).
+  static Future<void> enterGrade(String bilkentId, String courseId, String assignmentId, int grade) async {
+    await _firestore.collection('Grade').add({
       'studentId': bilkentId,
       'courseId': courseId,
       'assignmentId': assignmentId,
@@ -363,46 +332,26 @@ class DBHelper {
     });
   }
 
-  // GET getAllGrades: Belirtilen kurs parametrelerine göre tüm notları döner.
-  // CTIS310 ve CTIS290 için tüm öğrencilerin notlarını döner.
+  /// Belirtilen kursa ait tüm notları getirir.
   static Future<Map<String, dynamic>> getAllGrades(String courseId) async {
-    await init();
-    List<Map<String, dynamic>> result;
-    if (courseId == 'CTIS310') {
-      result = await _database!.query(
-        'Grade',
-        where: 'courseId = ?',
-        whereArgs: [courseId],
-      );
-    } else if (courseId == 'CTIS290') {
-      result = await _database!.query(
-        'Grade',
-        where: 'courseId = ?',
-        whereArgs: [courseId],
-      );
-    } else {
-      throw Exception('Invalid courseId');
-    }
-
-    if (result.isNotEmpty) {
+    final snapshot = await _firestore
+        .collection('Grade')
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
       Map<String, Map<String, dynamic>> grades = {};
-      for (var grade in result) {
-        final student = await getStudentInfo(grade['studentId']);
-        final assignment = await _database!.query(
-          'Assignment',
-          where: 'id = ?',
-          whereArgs: [grade['assignmentId']],
-        );
-        if (assignment.isNotEmpty) {
-          String assignmentName = assignment.first['name'] as String;
-          if (!grades.containsKey(student['id'])) {
-            grades[student['id']] = {
-              'name': student['name'],
-              'surname': student['surname'],
-              'grades': {}
-            };
-          }
-          grades[student['id']]!['grades'][assignmentName] = grade['grade'];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final student = await getStudentInfo(data['studentId']);
+        final assignmentDoc = await _firestore.collection('Assignment').doc(data['assignmentId']).get();
+        if (assignmentDoc.exists) {
+          final assignmentData = assignmentDoc.data()!;
+          final assignmentName = assignmentData['name'] as String;
+          grades[student['id']] ??= {
+            'name': student['name'],
+            'grades': {},
+          };
+          grades[student['id']]!['grades'][assignmentName] = data['grade'];
         }
       }
       return {'grades': grades};
@@ -410,47 +359,79 @@ class DBHelper {
     throw Exception('Failed to fetch grade info');
   }
 
-  // POST DeactiveCourse: Belirtilen kursu devre dışı bırakır.
-  static Future<void> deactiveCourse(String courseId) async {
-    await update(
-      'Course',
-      {'isActive': 0},
-      'id = ?',
-      [courseId],
-    );
-  }
+  // --- StudentCourses İşlemleri ---
 
-  // GET AllStudents: Tüm öğrencileri ve ilgili kurs bilgilerini döner.
-  static Future<List<Map<String, dynamic>>> getAllStudents() async {
-    await init();
-    final List<Map<String, dynamic>> students = await _database!.query('User', where: 'role = ?', whereArgs: ['student']);
-    List<Map<String, dynamic>> studentCourses = [];
-
-    for (var student in students) {
-      final List<Map<String, dynamic>> courses = await _database!.query(
-        'StudentCourse',
-        where: 'studentId = ?',
-        whereArgs: [student['id']],
-      );
-
-      List<Map<String, dynamic>> courseDetails = [];
-      for (var course in courses) {
-        final List<Map<String, dynamic>> courseInfo = await _database!.query(
-          'Course',
-          where: 'id = ?',
-          whereArgs: [course['courseId']],
-        );
-        if (courseInfo.isNotEmpty) {
-          courseDetails.add(courseInfo.first);
+  /// Belirtilen kursa kayıtlı öğrencileri getirir (StudentCourses koleksiyonu).
+  static Future<List<Map<String, dynamic>>> getStudentsFromCourses(String courseId) async {
+    final snapshot = await _firestore
+        .collection('StudentCourses')
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    if (snapshot.docs.isNotEmpty) {
+      List<Map<String, dynamic>> students = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final userSnapshot = await _firestore.collection('User').doc(data['studentId']).get();
+        if (userSnapshot.exists) {
+          students.add({
+            'id': userSnapshot.id,
+            ...userSnapshot.data() as Map<String, dynamic>,
+          });
         }
       }
-
-      studentCourses.add({
-        'student': student,
-        'courses': courseDetails,
-      });
+      return students;
     }
+    throw Exception('Failed to fetch course students');
+  }
 
-    return studentCourses;
+  // --- Submissions İşlemleri ---
+
+  /// submit310: Course için (courseCode "310") yeni Submission ekler.
+  static Future<void> submit310(String bilkentId, String comments, String assignmentId) async {
+    await _firestore.collection('Submissions').add({
+      'courseId': '310', // courseCode olarak
+      'studentId': bilkentId,
+      'assignmentId': assignmentId,
+      'comments': comments,
+      'submittedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  /// submit290: Course için (courseCode "290") yeni Submission ekler.
+  static Future<void> submit290(String bilkentId, String comments, String assignmentId) async {
+    await _firestore.collection('Submissions').add({
+      'courseId': '290', // courseCode olarak
+      'studentId': bilkentId,
+      'assignmentId': assignmentId,
+      'comments': comments,
+      'submittedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  // --- getCurrentDetails ---
+
+  /// Verilen courseCode için aktif kurs ve ilişkili Assignment'ları getirir.
+  static Future<Map<String, dynamic>> getCurrentDetails(String courseCode) async {
+    final courseDoc = await getActiveCourseDoc(courseCode);
+    if (courseDoc == null) {
+      throw Exception('No active course found for code $courseCode');
+    }
+    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final assignmentsSnapshot = await _firestore
+        .collection('Assignment')
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    List<Map<String, dynamic>> assignments = assignmentsSnapshot.docs.map((doc) => {
+      'id': doc.id,
+      ...doc.data() as Map<String, dynamic>,
+    }).toList();
+
+    return {
+      'course': {
+        'id': courseId,
+        ...courseDoc.data() as Map<String, dynamic>,
+      },
+      'assignments': assignments,
+    };
   }
 }

@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:ctisims/dbHelper.dart';
 import 'submission_page.dart';
 import 'assigned_submissions_page.dart';
 import 'export_page.dart';
 import 'search_page.dart';
+import 'login_page.dart'; // For UserData
 
 class DashboardPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters;
+  final UserData userData; // added userData field
 
-  const DashboardPage({super.key, required this.registeredSemesters});
+  const DashboardPage({super.key, required this.registeredSemesters, required this.userData});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late List<Map<String, String>> filteredSemesters;
+  List<Map<String, dynamic>> allCourses = [];  // <<-- new variable
+  late List<Map<String, dynamic>> filteredSemesters;
   String searchQuery = "";
   String sortOption = "Year Ascending"; // default sort
   bool darkMode = false;
@@ -29,33 +33,63 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     filteredSemesters = List.from(widget.registeredSemesters);
+    _fetchCourses();
+  }
+
+  // Fetch courses from Firestore using getAllCourses for Admin and getActiveCourses for Students
+  Future<void> _fetchCourses() async {
+    try {
+      final List<Map<String, dynamic>> courses;
+      // Determine user role from registeredSemesters; if first entry is Admin, then use getAllCourses
+      if (widget.userData.role == 'Admin') {
+        courses = await DBHelper.getAllCourses();
+      } else {
+        courses = await DBHelper.getActiveCourses();
+      }
+      setState(() {
+        allCourses = courses.map((course) {
+          return {
+            'year': course['year'],
+            'semester': course['semester'],
+            'code': course['code'],
+            'courseId': course['courseId'],
+          };
+        }).toList();
+        filteredSemesters = List.from(allCourses);
+        _applyFilters();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching courses: $e')),
+      );
+    }
   }
 
   // Apply search and all filters
   void _applyFilters() {
     setState(() {
-      filteredSemesters = widget.registeredSemesters.where((semester) {
+      filteredSemesters = allCourses.where((course) {
         bool matches = true;
         // Search filter (course name)
         if (searchQuery.isNotEmpty) {
           matches = matches &&
-              (semester['course']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+              (course['course']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
         }
         // Role filter
         if (roleFilter != "All") {
-          matches = matches && (semester['role'] == roleFilter);
+          matches = matches && (course['role'] == roleFilter);
         }
         // Year filter
         if (yearFilter != "All") {
-          matches = matches && (semester['year'] == yearFilter);
+          matches = matches && (course['year'] == yearFilter);
         }
         // Semester filter
         if (semesterFilter != "All") {
-          matches = matches && (semester['semester'] == semesterFilter);
+          matches = matches && (course['semester'] == semesterFilter);
         }
         // Course filter
         if (courseFilter != "All") {
-          matches = matches && (semester['course'] == courseFilter);
+          matches = matches && (course['course'] == courseFilter);
         }
         return matches;
       }).toList();
@@ -250,7 +284,7 @@ class _DashboardPageState extends State<DashboardPage> {
             },
             icon: Icon(darkMode ? Icons.dark_mode : Icons.light_mode),
           ),
-          if (widget.registeredSemesters.any((semester) => semester['role'] == 'Admin')) ...[
+          if (widget.userData.role == 'Admin') ...[ // use userData.role
             TextButton(
               onPressed: () {
                 Navigator.push(
@@ -370,10 +404,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     itemCount: filteredSemesters.length,
                     itemBuilder: (context, index) {
                       final semester = filteredSemesters[index];
-                      final role = semester['role'] ?? 'Student';
-                      final String buttonText = role == 'Student'
-                          ? 'View Submission'
-                          : 'Evaluate Submission';
+                      // Use userData.role to decide button text
+                      final String buttonText = widget.userData.role == 'Admin'
+                          ? 'Evaluate Submission'
+                          : 'View Submission';
                       return Card(
                         color: cardBgColor,
                         elevation: 4,
@@ -414,7 +448,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               // Center: Course Code emphasized
                               Center(
                                 child: Text(
-                                  semester['course'] ?? '',
+                                  "CTIS ${semester['code'] ?? ''}",
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall
@@ -437,18 +471,18 @@ class _DashboardPageState extends State<DashboardPage> {
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                   ),
                                   onPressed: () {
-                                    if (role == 'Student') {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => SubmissionPage(course: semester['course']!),
-                                        ),
-                                      );
-                                    } else if (role == 'Admin') {
+                                    if (widget.userData.role == 'Admin') {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) => const AssignedSubmissionsPage(),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => SubmissionPage(course: semester['course']!),
                                         ),
                                       );
                                     }
