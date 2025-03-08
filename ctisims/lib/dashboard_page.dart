@@ -475,7 +475,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const AssignedSubmissionsPage(),
+                                          builder: (context) => AssignedSubmissionsPage(courseId: semester['courseId']),
                                         ),
                                       );
                                     } else {
