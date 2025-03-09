@@ -84,7 +84,7 @@ class _HomePageState extends State<HomePage> {
 
   final List<String> _years = ['2023', '2024', '2025'];
   final List<String> _semesters = ['Fall', 'Spring'];
-  final List<String> _courses = ['CTIS310', 'CTIS290'];
+  final List<String> _courseList = ['CTIS310', 'CTIS290'];
   final List<String> _roles = ['Student', 'Admin'];
   final List<String> _changeDeadlineCourses = ['CTIS 290', 'CTIS 310'];
   final List<String> _ctis290Options = ['Report'];
@@ -167,11 +167,27 @@ class _HomePageState extends State<HomePage> {
   Future<List<Map<String, dynamic>>>? _deadline310;
   Future<List<Map<String, dynamic>>>? _deadline290;
 
+  // New variables for dropdown selections
+  List<Map<String, dynamic>> _students = [];
+  List<Map<String, dynamic>> _courses = [];
+  Map<String, dynamic>? _selectedStudent;
+  Map<String, dynamic>? _selectedCourse;
+
   @override
   void initState() {
     super.initState();
     _deadline310 = DBHelper.getActiveCourseAssignments("310");
     _deadline290 = DBHelper.getActiveCourseAssignments("290");
+    _loadStudentsAndCourses();
+  }
+
+  Future<void> _loadStudentsAndCourses() async {
+    final students = await DBHelper.getAllStudents();
+    final courses = await DBHelper.getAllCourses();
+    setState(() {
+      _students = students;
+      _courses = courses;
+    });
   }
 
   @override
@@ -275,6 +291,13 @@ class _HomePageState extends State<HomePage> {
                     headerIcon: Icons.person_add_alt,
                     buttonText: 'Add User',
                     modalContent: _addUserModalContent(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSectionCard(
+                    headerTitle: 'Add Student Course',
+                    headerIcon: Icons.school,
+                    buttonText: 'Add',
+                    modalContent: _addStudentCourseModalContent(),
                   ),
                 ],
               ],
@@ -629,7 +652,7 @@ class _HomePageState extends State<HomePage> {
                   labelText: 'Course',
                   border: OutlineInputBorder(),
                 ),
-                items: _courses
+                items: _courseList
                     .map((course) => DropdownMenuItem(value: course, child: Text(course)))
                     .toList(),
                 onChanged: (value) {
@@ -784,6 +807,90 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
             child: const Text('Add User'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _addStudentCourseModalContent() {
+    return Form(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Add Student Course',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          AppStyles.fieldSpacing,
+          // Student dropdown using DropdownButtonFormField without a custom selectedItemBuilder.
+          DropdownButtonFormField<Map<String, dynamic>>(
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: "Select Student",
+              border: OutlineInputBorder(),
+            ),
+            value: _selectedStudent,
+            items: _students.map((student) {
+              return DropdownMenuItem<Map<String, dynamic>>(
+                value: student,
+                child: Text("${student['name']} (${student['bilkentId']})"),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedStudent = value;
+              });
+            },
+          ),
+          AppStyles.fieldSpacing,
+          // Course dropdown using similar approach.
+          DropdownButtonFormField<Map<String, dynamic>>(
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: "Select Course",
+              border: OutlineInputBorder(),
+            ),
+            value: _selectedCourse,
+            items: _courses.map((course) {
+              return DropdownMenuItem<Map<String, dynamic>>(
+                value: course,
+                child: Text("CTIS${course['code']} - ${course['year']} ${course['semester']}"),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedCourse = value;
+              });
+            },
+          ),
+          AppStyles.fieldSpacing,
+          ElevatedButton(
+            onPressed: () async {
+              if (_selectedStudent != null && _selectedCourse != null) {
+                final bilkentId = _selectedStudent!['bilkentId']?.toString() ?? '';
+                final name = _selectedStudent!['name'] ?? 'Unknown';
+                final courseId = _selectedCourse!['courseId']?.toString() ?? '';
+                try {
+                  await DBHelper.addStudentToCourse(bilkentId, courseId, name);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Student added to course")),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $e")),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppStyles.buttonColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            ),
+            child: const Text('Add'),
           ),
         ],
       ),

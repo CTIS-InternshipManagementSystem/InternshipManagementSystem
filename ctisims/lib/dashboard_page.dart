@@ -44,15 +44,16 @@ class _DashboardPageState extends State<DashboardPage> {
       if (widget.userData.role == 'Admin') {
         courses = await DBHelper.getAllCourses();
       } else {
-        courses = await DBHelper.getActiveCourses();
+        courses = await DBHelper.getCourseForStudent(widget.userData.bilkentId);
       }
       setState(() {
         allCourses = courses.map((course) {
           return {
             'year': course['year'],
             'semester': course['semester'],
-            'code': course['code'],
+            'code': course['code'], // Use 'code' for course name
             'courseId': course['courseId'],
+            'role': course['role'] ?? '', // Include role if provided
           };
         }).toList();
         filteredSemesters = List.from(allCourses);
@@ -70,10 +71,10 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       filteredSemesters = allCourses.where((course) {
         bool matches = true;
-        // Search filter (course name)
+        // Search filter: use course['code'] instead of course['course']
         if (searchQuery.isNotEmpty) {
           matches = matches &&
-              (course['course']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+              (course['code']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
         }
         // Role filter
         if (roleFilter != "All") {
@@ -87,9 +88,9 @@ class _DashboardPageState extends State<DashboardPage> {
         if (semesterFilter != "All") {
           matches = matches && (course['semester'] == semesterFilter);
         }
-        // Course filter
+        // Course filter: use course['code']
         if (courseFilter != "All") {
-          matches = matches && (course['course'] == courseFilter);
+          matches = matches && (course['code'] == courseFilter);
         }
         return matches;
       }).toList();
@@ -125,11 +126,11 @@ class _DashboardPageState extends State<DashboardPage> {
           break;
         case "Course Ascending":
           filteredSemesters.sort(
-              (a, b) => (a['course'] ?? "").compareTo(b['course'] ?? ""));
+              (a, b) => (a['code'] ?? "").compareTo(b['code'] ?? ""));
           break;
         case "Course Descending":
           filteredSemesters.sort(
-              (a, b) => (b['course'] ?? "").compareTo(a['course'] ?? ""));
+              (a, b) => (b['code'] ?? "").compareTo(a['code'] ?? ""));
           break;
         default:
           break;
@@ -285,16 +286,16 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Icon(darkMode ? Icons.dark_mode : Icons.light_mode),
           ),
           if (widget.userData.role == 'Admin') ...[ // use userData.role
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => ExportPage(semesters: widget.registeredSemesters)),
-                );
-              },
-              child: const Text('Statistics & Grades', style: TextStyle(color: Colors.white)),
-            ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => ExportPage(registeredSemesters: widget.registeredSemesters)),
+              );
+            },
+            child: const Text('Statistics & Grades', style: TextStyle(color: Colors.white)),
+          ),
             TextButton(
               onPressed: () {
                 Navigator.push(

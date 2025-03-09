@@ -1,4 +1,11 @@
+import 'dart:io';
+
+import 'dart:html' as html;
+import 'package:ctisims/dbHelper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:excel/excel.dart';
+import 'package:path_provider/path_provider.dart';
 
 // Centralized styling constants (reuse or import from your common styles file)
 class AppStyles {
@@ -11,9 +18,9 @@ class AppStyles {
 }
 
 class ExportPage extends StatefulWidget {
-  final List<Map<String, String>> semesters;
+  final List<Map<String, String>> registeredSemesters; // added field
 
-  const ExportPage({super.key, required this.semesters});
+  const ExportPage({super.key, required this.registeredSemesters}); // updated constructor
 
   @override
   _ExportPageState createState() => _ExportPageState();
@@ -22,26 +29,43 @@ class ExportPage extends StatefulWidget {
 class _ExportPageState extends State<ExportPage> {
   bool darkMode = false;
   String searchQuery = "";
-  late List<Map<String, String>> filteredSemesters;
+
+  // Replace semesters with courses loaded from DBHelper.getAllCourses()
+  List<Map<String, dynamic>> _allCourses = [];
+  List<Map<String, dynamic>> _filteredCourses = [];
 
   // Per-card loading states using maps keyed by card index.
   final Map<int, bool> _gradesLoading = {};
-  final Map<int, bool> _statisticsLoading = {};
   final Map<int, bool> _submissionsLoading = {};
   final Map<int, bool> _deactivateLoading = {};
 
   @override
   void initState() {
     super.initState();
-    filteredSemesters = widget.semesters;
+    _fetchCourses();
+  }
+
+  Future<void> _fetchCourses() async {
+    try {
+      final courses = await DBHelper.getAllCourses();
+      setState(() {
+        _allCourses = courses;
+        _filteredCourses = List.from(courses);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error fetching courses: $e")),
+      );
+    }
   }
 
   void updateSearch(String query) {
     setState(() {
       searchQuery = query;
-      filteredSemesters = widget.semesters.where((semester) {
-        final course = (semester['course'] ?? "").toLowerCase();
-        return course.contains(query.toLowerCase());
+      _filteredCourses = _allCourses.where((course) {
+        // Assuming we display course as "CTIS${course['code']}"
+        final courseText = "CTIS${course['code']}".toLowerCase();
+        return courseText.contains(query.toLowerCase());
       }).toList();
     });
   }
@@ -52,10 +76,97 @@ class _ExportPageState extends State<ExportPage> {
     onCompleted();
   }
 
+  // Add helper function to export grades in Excel format using getAllGradesWithStudentInfo.
+  Future<void> _exportGradesExcel(String courseId) async {
+    try {
+      debugPrint("Exporting grades for course: $courseId");
+      final gradeData = await DBHelper.getAllGradesWithStudentInfo(courseId);
+      if (!mounted) return;
+      var excel = Excel.createExcel();
+      Sheet sheet = excel['Grades'];
+
+      sheet.appendRow([
+        TextCellValue("Student ID"),
+        TextCellValue("Student Name"),
+        TextCellValue("Assignment"),
+        TextCellValue("Grade"),
+      ]);
+
+      // Changed cast for grades map:
+      final grades = (gradeData['grades'] as Map).cast<String, dynamic>();
+      grades.forEach((studentId, info) {
+        final String name = info['name'] ?? '';
+        final gradeMap = (info['grades'] as Map?)?.cast<String, dynamic>() ?? {};
+        gradeMap.forEach((assignment, grade) {
+          sheet.appendRow([
+            TextCellValue(studentId),
+            TextCellValue(name),
+            TextCellValue(assignment),
+            TextCellValue(grade?.toString() ?? ''),
+          ]);
+        });
+      });
+
+      final excelBytes = excel.encode();
+      if (excelBytes == null) throw Exception("Failed to encode Excel file");
+      if (kIsWeb) {
+        final blob = html.Blob(
+          [excelBytes],
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        // Remove or comment out the unused local variable anchor.
+        // final anchor = html.AnchorElement(href: url);
+        // anchor.download = "grades_$courseId.xlsx";
+        // anchor.click();
+
+        html.AnchorElement(href: url)
+          ..download = "grades_$courseId.xlsx"
+          ..click();
+
+        html.Url.revokeObjectUrl(url);
+      } else {
+        final directory = await getTemporaryDirectory();
+        if (!mounted) return; // Check if (mounted) after async gap.
+        final filePath = '${directory.path}/grades_$courseId.xlsx';
+        final File file = File(filePath);
+        await file.writeAsBytes(excelBytes, flush: true);
+        if (!mounted) return; // Check if (mounted).
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Excel file saved at: $filePath")),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return; // Check if (mounted).
+      debugPrint("Error exporting grades: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error exporting grades: $e")),
+      );
+    }
+  }
+
+  // Add helper function to deactivate the course.
+  Future<void> _deactivateCourse(String courseId) async {
+    try {
+      await DBHelper.deactiveCourse(courseId);
+      if (!mounted) return; // Check if (mounted).
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Course $courseId deactivated successfully")),
+      );
+    } catch (e) {
+      if (!mounted) return; // Check if (mounted).
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error deactivating course: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor = darkMode ? Colors.black : Colors.grey[100];
     final textColor = darkMode ? Colors.white : Colors.black;
+    // Replace .withOpacity(0.6) with .withAlpha(153).
+    final hintColor = textColor.withAlpha(153);
 
     return Scaffold(
       appBar: AppBar(
@@ -84,7 +195,7 @@ class _ExportPageState extends State<ExportPage> {
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
                 hintText: "Search by course...",
-                hintStyle: TextStyle(color: textColor.withOpacity(0.6)),
+                hintStyle: TextStyle(color: hintColor),
                 prefixIcon: Icon(Icons.search, color: textColor),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppStyles.borderRadius),
@@ -109,9 +220,9 @@ class _ExportPageState extends State<ExportPage> {
                       mainAxisSpacing: 16,
                       childAspectRatio: 3 / 2,
                     ),
-                    itemCount: filteredSemesters.length,
+                    itemCount: _filteredCourses.length,
                     itemBuilder: (context, index) {
-                      final semester = filteredSemesters[index];
+                      final course = _filteredCourses[index];
                       return Card(
                         elevation: AppStyles.cardElevation,
                         shape: RoundedRectangleBorder(
@@ -127,14 +238,14 @@ class _ExportPageState extends State<ExportPage> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    semester['year'] ?? '',
+                                    course['year'] ?? '',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyLarge
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
-                                    semester['semester'] ?? '',
+                                    course['semester'] ?? '',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyLarge
@@ -146,7 +257,7 @@ class _ExportPageState extends State<ExportPage> {
                               // Center: Course Code emphasized
                               Center(
                                 child: Text(
-                                  semester['course'] ?? '',
+                                  "CTIS ${course['code'] ?? ''}",
                                   style: Theme.of(context)
                                       .textTheme
                                       .headlineSmall
@@ -157,36 +268,26 @@ class _ExportPageState extends State<ExportPage> {
                               // Action Buttons Column.
                               Column(
                                 children: [
-                                  // Export Grades Button
+                                  // Updated Export Grades Button.
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _gradesLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _gradesLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
-                                                setState(() {
-                                                  _gradesLoading[index] = false;
-                                                });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Grades exported successfully")),
-                                                );
-                                              });
-                                            },
+                                      onPressed: () async {
+                                        setState(() {
+                                          _gradesLoading[index] = true;
+                                        });
+                                        await _exportGradesExcel(course['courseId'] ?? '');
+                                        setState(() {
+                                          _gradesLoading[index] = false;
+                                        });
+                                      },
                                       icon: _gradesLoading[index] == true
                                           ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator())
                                           : const Icon(Icons.grade),
-                                      label: const Text("Export Grades"),
+                                      label: const Text("Export Grades (Excel)"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
@@ -237,41 +338,27 @@ class _ExportPageState extends State<ExportPage> {
                                     ),
                                   ),
                                   AppStyles.fieldSpacing,
-                                  // Deactivate Semester Button
+                                  // Updated Deactivate Course Button.
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _deactivateLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _deactivateLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
-                                                setState(() {
-                                                  _deactivateLoading[index] = false;
-                                                });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Semester deactivated")),
-                                                );
-                                              });
-                                            },
+                                      onPressed: () async {
+                                        setState(() {
+                                          _deactivateLoading[index] = true;
+                                        });
+                                        await _deactivateCourse(course['courseId'] ?? '');
+                                        setState(() {
+                                          _deactivateLoading[index] = false;
+                                        });
+                                      },
                                       icon: _deactivateLoading[index] == true
                                           ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
+                                              height: 24,
+                                              width: 24,
+                                              child: CircularProgressIndicator())
                                           : const Icon(Icons.cancel),
-                                      label: const Text("Deactivate"),
+                                      label: const Text("Deactivate Course"),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppStyles.buttonColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                                        ),
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                       ),
                                     ),
