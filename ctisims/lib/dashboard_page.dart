@@ -482,7 +482,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => SubmissionPage(course: semester['course']!),
+                                          builder: (context) => SubmissionPage(
+                                            submission: {
+                                              'bilkentId': widget.userData.bilkentId,
+                                              'name': widget.userData.username,
+                                              'role': widget.userData.role,
+                                              'courseId': semester['courseId'] ?? '',
+                                              'year': semester['year'] ?? '',
+                                              'semester': semester['semester'] ?? '',
+                                              'code': semester['code'] ?? '',
+                                            },
+                                          ),
                                         ),
                                       );
                                     }

@@ -197,7 +197,20 @@ class _HomePageState extends State<HomePage> {
           ),
           TextButton(
             onPressed: () {},
-            child: const Text('Begin (Dr.)', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: Text('${widget.userData.username}', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
+          //Logout button
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginPage(),
+                ),
+              );
+            },
+            child: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
           ),
         ],
       ),

@@ -104,21 +104,13 @@ class _EvaluatePageState extends State<EvaluatePage> {
   }
   
   Future<Map<String, dynamic>> loadEvaluationData() async {
-    // Extract bilkentId and courseId from the submission map.
     final String bilkentId = widget.submission['bilkentId'] ?? '';
     final String courseId = widget.submission['courseId'] ?? '';
-    // Get student info using DBHelper.getStudentInfo (or getUserInfo if available)
     final student = await DBHelper.getStudentInfo(bilkentId);
-    // Get course info (expects to return fields: year, semester, code)
     final course = await DBHelper.getCourseInfo(courseId);
-    // Get assignments for the course using DBHelper.getAssignments
     final assignments = await DBHelper.getAssignments(courseId);
     List<Map<String, dynamic>> assignmentsWithGrade = [];
     for (var assignment in assignments) {
-      // Use the assignment's id to fetch corresponding grade from the Grade collection.
-      // For instance, if assignment['id'] == "3" and a Grade document exists with
-      // { assignmentId: "3", bilkentId: "22002357", courseId: "1", grade: 85 },
-      // then that grade (85) is returned; otherwise, "not graded" is set.
       String grade;
       try {
         final gradeData = await DBHelper.getGrade(bilkentId, assignment['id'], courseId);
@@ -166,7 +158,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
           final year = courseData['year'] ?? '2024';
           final semester = courseData['semester'] ?? 'Fall';
           final code = courseData['code'] ?? '310';
-          final destinationBase = "${year}_${semester}/CTIS$code/${studentName}_$bilkentId";
+          final destinationBase = "${year} ${semester}/CTIS$code/${studentName}_$bilkentId";
           final List assignments = snapshot.data!['assignments'];
           
           return SingleChildScrollView(
@@ -251,7 +243,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
                   const SizedBox(height: 16),
                   _buildCTIS310Section('Follow Up 5'),
                   const SizedBox(height: 16),
-                  _buildCTIS310Section('Reports'),
+                  _buildCTIS310Section('Report'),
                 ],
                 // CTIS 290 Specific Section
                 if (courseData['code'] == '290') ...[
@@ -389,13 +381,13 @@ class _EvaluatePageState extends State<EvaluatePage> {
     setState(() {
       _isUploading = true;
     });
-    try {
-      await Firebase.initializeApp();
       String fileName;
       Reference storageRef;
+      fileName = "CompanyEvaluation_${widget.submission['bilkentId']}_${widget.submission['studentName']}";
+    try {
+      await Firebase.initializeApp();
       if (kIsWeb) {
         if (fileBytes == null) throw Exception("No file bytes provided for web upload");
-        fileName = "CompanyEvaluation_${widget.submission['bilkentId']}_${widget.submission['studentName']}";
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
         final uploadTask = storageRef.putData(fileBytes);
@@ -404,9 +396,13 @@ class _EvaluatePageState extends State<EvaluatePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("File uploaded successfully: $downloadUrl")),
         );
+        final String bilkentId = widget.submission['bilkentId'] ?? '';
+        final String courseId = widget.submission['courseId'] ?? '';
+        final bool companyEvaluationUploaded = true; // or set this based on your logic
+        DBHelper.changeCompanyEvaluation(bilkentId, courseId, companyEvaluationUploaded);
+
       } else {
         final file = File(filePath!);
-        fileName = "CompanyEvaluation_${widget.submission['bilkentId']}_${widget.submission['studentName']}";
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
         final uploadTask = storageRef.putFile(file);
@@ -415,10 +411,14 @@ class _EvaluatePageState extends State<EvaluatePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("File uploaded successfully: $downloadUrl")),
         );
+        final String bilkentId = widget.submission['bilkentId'] ?? '';
+        final String courseId = widget.submission['courseId'] ?? '';
+        final bool companyEvaluationUploaded = true; // or set this based on your logic
+        DBHelper.changeCompanyEvaluation(bilkentId, courseId, companyEvaluationUploaded);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error during file upload: $e")),
+        SnackBar(content: Text("Error during file upload: $e" + "destinationBase: $destinationBase/$fileName")),
       );
     } finally {
       setState(() {
@@ -450,7 +450,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Download error: $e")),
+        SnackBar(content: Text("Download error: $e" + "destinationBase: $destinationBase/$fileName")),
       );
     } finally {
       setState(() {
@@ -511,6 +511,10 @@ class _EvaluatePageState extends State<EvaluatePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$assignmentName grade submitted successfully!')),
       );
+      // Refresh the evaluation data to update the grades
+      setState(() {
+        evaluationData = loadEvaluationData();
+      });
     }
   }
 
@@ -536,8 +540,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
                 final data = await evaluationData;
                 final student = data['student'] ?? {};
                 final courseData = data['course'] ?? {};
-                final destB = "${courseData['year']}_${courseData['semester']}/CTIS${courseData['code']}/${student['name']}_${student['bilkentId']}";
-                downloadFile("CompanyEvaluation_${student['bilkentId']}_${student['name']}", destB);
+                final destB = "${courseData['year']} ${courseData['semester']}/CTIS${courseData['code']}/${student['name']}_${student['bilkentId']}";
+                downloadFile("${title}_${student['bilkentId']}_${student['name']}", destB);
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
               child: Text('Download $title'),
@@ -578,7 +582,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Reports about an internship',
+              'Report',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -588,8 +592,8 @@ class _EvaluatePageState extends State<EvaluatePage> {
                 final data = await evaluationData;
                 final student = data['student'] ?? {};
                 final courseData = data['course'] ?? {};
-                final destB = "${courseData['year']}_${courseData['semester']}/CTIS${courseData['code']}/${student['name']}_${student['bilkentId']}";
-                downloadFile("CompanyEvaluation_${student['bilkentId']}_${student['name']}", destB);
+                final destB = "${courseData['year']} ${courseData['semester']}/CTIS${courseData['code']}/${student['name']}_${student['bilkentId']}";
+                downloadFile("Report_${student['bilkentId']}_${student['name']}", destB);
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppStyles.buttonColor),
               child: const Text('Download Report'),

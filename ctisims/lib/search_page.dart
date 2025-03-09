@@ -1,5 +1,6 @@
+import 'package:ctisims/evaluate_page.dart';
 import 'package:flutter/material.dart';
-import 'submission_detail_page.dart';
+import 'package:ctisims/dbHelper.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,100 +23,32 @@ class _SearchPageState extends State<SearchPage> {
   String? _uploadFilePath;
   Uint8List? _uploadFileBytes;
 
-  // Dummy data for student submissions
-  final List<Map<String, String>> _studentSubmissions = [
-    {
-      'semester': '2022-2023 Fall',
-      'course': 'CTIS310',
-      'studentName': 'John Doe',
-      'bilkentId': '1110001',
-      'lecturerName': 'Dr. Smith',
-      'submissionStatus': 'Submitted',
-      'companyEvaluation': 'Uploaded'
-    },
-    {
-      'semester': '2022-2023 Fall',
-      'course': 'CTIS290',
-      'studentName': 'Jane Doe',
-      'bilkentId': '1110002',
-      'lecturerName': 'Dr. Brown',
-      'submissionStatus': 'Not Submitted',
-      'companyEvaluation': 'Not Uploaded'
-    },
-  ];
-
-  List<Map<String, String>> _filteredSubmissions = [];
-
-  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+  Future<List<Map<String, dynamic>>>? _futureStudentCourses;
 
   @override
   void initState() {
     super.initState();
-    _filteredSubmissions = _studentSubmissions;
+    _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
+    _bilkentIdController.addListener(_searchSubmissions);
   }
 
   void _searchSubmissions() {
     final bilkentId = _bilkentIdController.text;
     setState(() {
-      _filteredSubmissions = _studentSubmissions
-          .where((submission) => submission['bilkentId'] == bilkentId)
-          .toList();
+      _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo().then((submissions) {
+        if (bilkentId.isEmpty) {
+          return submissions;
+        } else {
+          return submissions.where((submission) => submission['bilkentId'].startsWith(bilkentId)).toList();
+        }
+      });
     });
   }
 
   void _updateFilteredSubmissions() {
     setState(() {
-      _filteredSubmissions = _studentSubmissions;
+      _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
     });
-  }
-
-  Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
-    try {
-      await Firebase.initializeApp();
-      String fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
-      final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
-      Reference storageRef;
-      if (kIsWeb) {
-        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
-        final destination = "$destinationBase/$fileName";
-        storageRef = FirebaseStorage.instance.ref(destination);
-        final uploadTask = storageRef.putData(fileBytes);
-        final snapshot = await uploadTask.whenComplete(() => null);
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("Dosya başarıyla yüklendi: $downloadUrl");
-      } else {
-        final file = File(filePath!);
-        final destination = "$destinationBase/$fileName";
-        storageRef = FirebaseStorage.instance.ref(destination);
-        final uploadTask = storageRef.putFile(file);
-        final snapshot = await uploadTask.whenComplete(() => null);
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("Dosya başarıyla yüklendi: $downloadUrl");
-      }
-    } catch (e) {
-      print("Dosya yükleme sırasında bir hata oluştu: $e");
-    }
-  }
-
-  Future<void> downloadFile(String fileName) async {
-    try {
-      final String destination = "$destinationBase/$fileName";
-      final ref = FirebaseStorage.instance.ref(destination);
-      final downloadUrl = await ref.getDownloadURL();
-      if (kIsWeb) {
-        html.AnchorElement anchor = html.AnchorElement(href: downloadUrl);
-        anchor.download = fileName;
-        anchor.click();
-      } else {
-        final response = await http.get(Uri.parse(downloadUrl));
-        final Directory appDocDir = await getApplicationDocumentsDirectory();
-        final File file = File('${appDocDir.path}/$fileName');
-        await file.writeAsBytes(response.bodyBytes);
-        print("File downloaded to: ${file.path}");
-      }
-    } catch (e) {
-      print("Download error: $e");
-    }
   }
 
   @override
@@ -161,183 +94,295 @@ class _SearchPageState extends State<SearchPage> {
             TextField(
               controller: _bilkentIdController,
               decoration: const InputDecoration(
-                labelText: 'Bilkent ID',
-                border: OutlineInputBorder(),
+              labelText: 'Bilkent ID',
+              border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _searchSubmissions,
-              child: const Text('Search Student Submissions'),
+              onChanged: (value) {
+              _searchSubmissions();
+              },
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _filteredSubmissions.length,
-                itemBuilder: (context, index) {
-                  final submission = _filteredSubmissions[index];
-                  return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Semester: ${submission['semester']}'),
-                          const SizedBox(height: 4),
-                          Text('Course: ${submission['course']}'),
-                          const SizedBox(height: 4),
-                          Text('Student Name: ${submission['studentName']}'),
-                          const SizedBox(height: 4),
-                          Text('Bilkent ID: ${submission['bilkentId']}'),
-                          const SizedBox(height: 4),
-                          Text('Lecturer Name: ${submission['lecturerName']}'),
-                          const SizedBox(height: 4),
-                          Text('Submission Status: ${submission['submissionStatus']}'),
-                          const SizedBox(height: 16),
-                          if (_selectedOption == 'Uploading Company Evaluation Reports') ...[
-                            if (submission['companyEvaluation'] == 'Uploaded') ...[
-                              ElevatedButton(
-                                onPressed: () {
-                                  downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
-                                },
-                                child: const Text('Download Company Evaluation Report'),
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Implement delete logic
-                                },
-                                child: const Text('Delete Company Evaluation Report'),
-                              ),
-                            ] else ...[
-                              ElevatedButton(
-                                onPressed: () async {
-                                  if (kIsWeb) {
-                                    FilePickerResult? result = await FilePicker.platform.pickFiles();
-                                    if (result != null) {
-                                      setState(() {
-                                        _uploadFileBytes = result.files.single.bytes;
-                                        _uploadFilePath = result.files.single.name;
-                                      });
-                                    }
-                                  } else {
-                                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
-                                    if (result != null) {
-                                      setState(() {
-                                        _uploadFilePath = result.files.single.path;
-                                      });
-                                    }
-                                  }
-                                },
-                                child: const Text('Choose File'),
-                              ),
-                              if (_uploadFilePath != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text('Seçilen dosya: $_uploadFilePath'),
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _futureStudentCourses,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.data!.isEmpty) {
+                    return const Center(child: Text("No students found"));
+                  }
+                  final studentCourses = snapshot.data!;
+                  return ListView.builder(
+                    itemCount: studentCourses.length,
+                    itemBuilder: (context, index) {
+                      final submission = studentCourses[index];
+                      final course = submission['course'];
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Year: ${course['year']}'),
+                              const SizedBox(height: 4),
+                              Text('Semester: ${course['semester']}'),
+                              const SizedBox(height: 4),
+                              Text('Course: CTIS ${course['code']}'),
+                              const SizedBox(height: 4),
+                              Text('Student Name: ${submission['name']}'),
+                              const SizedBox(height: 4),
+                              Text('Bilkent ID: ${submission['bilkentId']}'),
+                              const SizedBox(height: 4),
+                              Text('Company Evaluation Uploaded: ${submission['companyEvaluationUploaded']}'),
+                              const SizedBox(height: 16),
+                              if (_selectedOption == 'Uploading Company Evaluation Reports') ...[
+                                if (submission['companyEvaluationUploaded'] == true) ...[
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                                  try {
+                                                    final String destinationBase = "${course['year']} ${course['semester']}/CTIS${course['code']}/${submission['name']}_${submission['bilkentId']}";
+                                                    final String fileName = "CompanyEvaluation_${submission['bilkentId']}_${submission['name']}";
+                                                    final String destination = "$destinationBase/$fileName";
+                                                    final ref = FirebaseStorage.instance.ref(destination);
+                                                    final downloadUrl = await ref.getDownloadURL();
+                                                    if (kIsWeb) {
+                                                      html.AnchorElement anchor = html.AnchorElement(href: downloadUrl);
+                                                      anchor.download = fileName;
+                                                      anchor.click();
+                                                    } else {
+                                                      final response = await http.get(Uri.parse(downloadUrl));
+                                                      final Directory appDocDir = await getApplicationDocumentsDirectory();
+                                                      final File file = File('${appDocDir.path}/$fileName');
+                                                      await file.writeAsBytes(response.bodyBytes);
+                                                      print("File downloaded to: ${file.path}");
+                                                    }
+                                                  } catch (e) {
+                                                    print("Download error: $e");
+                                                  }
+                                    },
+                                    child: const Text('Download Company Evaluation Report'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      try {
+                                        final String destinationBase = "${course['year']} ${course['semester']}/CTIS${course['code']}/${submission['name']}_${submission['bilkentId']}";
+                                        final String fileName = "CompanyEvaluation_${submission['bilkentId']}_${submission['name']}";
+                                        final String destination = "$destinationBase/$fileName";
+                                        final ref = FirebaseStorage.instance.ref(destination);
+                                        await ref.delete();
+                                        print("Dosya başarıyla silindi: $fileName");
+                                        final bilkentId = submission['bilkentId'];
+                                        final courseId = course['id'];
+                                        final companyEvaluationUploaded = false;
+                                        DBHelper.changeCompanyEvaluation(bilkentId, courseId, companyEvaluationUploaded);
+                                        setState(() {
+                                        _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
+                                        });
+                                      } catch (e) {
+                                        print("Dosya silme sırasında bir hata oluştu: $e");
+                                      }
+                                    },
+                                    child: const Text('Delete Company Evaluation Report'),
+                                  ),
+                                ] else ...[
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      if (kIsWeb) {
+                                        FilePickerResult? result = await FilePicker.platform.pickFiles();
+                                        if (result != null) {
+                                          setState(() {
+                                            _uploadFileBytes = result.files.single.bytes;
+                                            _uploadFilePath = result.files.single.name;
+                                          });
+                                        }
+                                      } else {
+                                        FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                                        if (result != null) {
+                                          setState(() {
+                                            _uploadFilePath = result.files.single.path;
+                                          });
+                                        }
+                                      }
+                                    },
+                                    child: const Text('Choose File'),
+                                  ),
+                                  if (_uploadFilePath != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Text('Seçilen dosya: $_uploadFilePath'),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      if (kIsWeb) {
+                                        if (_uploadFileBytes != null) {
+                                          try {
+                                                await Firebase.initializeApp();
+                                                final String fileName = "CompanyEvaluation_${submission['bilkentId']}_${submission['name']}";
+                                                final String destinationBase = "${course['year']} ${course['semester']}/CTIS${course['code']}/${submission['name']}_${submission['bilkentId']}";
+                                                Reference storageRef;
+                                                if (kIsWeb) {
+                                                  if (_uploadFileBytes == null) throw Exception("No file bytes provided for web upload");
+                                                  final destination = "$destinationBase/$fileName";
+                                                  storageRef = FirebaseStorage.instance.ref(destination);
+                                                  final uploadTask = storageRef.putData(_uploadFileBytes!);
+                                                  final snapshot = await uploadTask.whenComplete(() => null);
+                                                  final downloadUrl = await snapshot.ref.getDownloadURL();
+                                                  print("Dosya başarıyla yüklendi: $downloadUrl");
+                                                  final bilkentId = submission['bilkentId'];
+                                                  final courseId = course['id'];
+                                                  final companyEvaluationUploaded = true;
+                                                  DBHelper.changeCompanyEvaluation(bilkentId, courseId, companyEvaluationUploaded);
+                                                  setState(() {
+                                                  _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
+                                                  });
+                                                } else {
+                                                  final file = File(_uploadFilePath!);
+                                                  final destination = "$destinationBase/$fileName";
+                                                  storageRef = FirebaseStorage.instance.ref(destination);
+                                                  final uploadTask = storageRef.putFile(file);
+                                                  final snapshot = await uploadTask.whenComplete(() => null);
+                                                  final downloadUrl = await snapshot.ref.getDownloadURL();
+                                                  print("Dosya başarıyla yüklendi: $downloadUrl");
+                                                  final bilkentId = submission['bilkentId'];
+                                                  final courseId = course['id'];
+                                                  final companyEvaluationUploaded = true;
+                                                  DBHelper.changeCompanyEvaluation(bilkentId, courseId, companyEvaluationUploaded);
+                                                  setState(() {
+                                                  _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
+                                                  });
+                                                }
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text("Success"),
+                                                content: const Text("File uploaded successfully."),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                                ],
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text("Error"),
+                                                content: const Text("File not uploaded."),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                                ],
+                                              ),
+                                            );
+                                          }
+                                        } else {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text("Error"),
+                                              content: const Text("No file selected."),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                      } else {
+                                        if (_uploadFilePath != null) {
+                                          try {
+                                              await Firebase.initializeApp();
+                                              final String fileName = "CompanyEvaluation_${submission['bilkentId']}_${submission['name']}";
+                                              final String destinationBase = "${course['year']} ${course['semester']}/CTIS${course['code']}/${submission['name']}_${submission['bilkentId']}";
+                                              Reference storageRef;
+                                              if (kIsWeb) {
+                                                if (_uploadFileBytes == null) throw Exception("No file bytes provided for web upload");
+                                                final destination = "$destinationBase/$fileName";
+                                                storageRef = FirebaseStorage.instance.ref(destination);
+                                                final uploadTask = storageRef.putData(_uploadFileBytes!);
+                                                final snapshot = await uploadTask.whenComplete(() => null);
+                                                final downloadUrl = await snapshot.ref.getDownloadURL();
+                                                print("Dosya başarıyla yüklendi: $downloadUrl");
+                                              } else {
+                                                final file = File(_uploadFilePath!);
+                                                final destination = "$destinationBase/$fileName";
+                                                storageRef = FirebaseStorage.instance.ref(destination);
+                                                final uploadTask = storageRef.putFile(file);
+                                                final snapshot = await uploadTask.whenComplete(() => null);
+                                                final downloadUrl = await snapshot.ref.getDownloadURL();
+                                                print("Dosya başarıyla yüklendi: $downloadUrl");
+                                              }
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text("Success"),
+                                                content: const Text("File uploaded successfully."),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                                ],
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text("Error"),
+                                                content: const Text("File not uploaded."),
+                                                actions: [
+                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                                ],
+                                              ),
+                                            );
+                                          }
+                                        } else {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text("Error"),
+                                              content: const Text("No file selected."),
+                                              actions: [
+                                                TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    child: const Text('Upload'),
+                                  ),
+                                ],
+                              ],
+                              if (_selectedOption == 'Search Student') ...[
+                                ElevatedButton(
+                                    onPressed: () {
+                                    final submissionMap = {
+                                      'bilkentId': submission['bilkentId'] ?? '',
+                                      'courseId': course['courseId'].toString(),
+                                      'studentName': submission['name'] ?? '',
+                                      'email': submission['email'] ?? '',
+                                      'course': 'CTIS' + (course['code'] ?? '310'),
+                                      'companyEvaluation': submission['companyEvaluationUploaded'] == true ? 'Uploaded' : 'Not Uploaded'
+                                    };
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                      builder: (context) => EvaluatePage(
+                                        submission: submissionMap.map((k, v) => MapEntry(k, v.toString())),
+                                      ),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('View Submission'),
                                 ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  if (kIsWeb) {
-                                    if (_uploadFileBytes != null) {
-                                      try {
-                                        await uploadFile(fileBytes: _uploadFileBytes);
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Success"),
-                                            content: const Text("File uploaded successfully."),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                            ],
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Error"),
-                                            content: const Text("File not uploaded."),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                    } else {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text("Error"),
-                                          content: const Text("No file selected."),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                          ],
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    if (_uploadFilePath != null) {
-                                      try {
-                                        await uploadFile(filePath: _uploadFilePath);
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Success"),
-                                            content: const Text("File uploaded successfully."),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                            ],
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text("Error"),
-                                            content: const Text("File not uploaded."),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                    } else {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text("Error"),
-                                          content: const Text("No file selected."),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                          ],
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                child: const Text('Upload'),
-                              ),
+                              ],
                             ],
-                          ],
-                          if (_selectedOption == 'Search Student') ...[
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => SubmissionDetailPage(submission: submission)),
-                                );
-                              },
-                              child: const Text('View Submission'),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

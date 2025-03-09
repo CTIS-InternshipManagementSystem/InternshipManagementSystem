@@ -368,6 +368,22 @@ class DBHelper {
 
   // --- StudentCourses İşlemleri ---
 
+  //Change company Evaluation
+  static Future<void> changeCompanyEvaluation(String bilkentId, String courseId, bool companyEvaluationUploaded) async {
+    await _firestore.collection('StudentCourses')
+        .where('courseId', isEqualTo: courseId)
+        .where('bilkentId', isEqualTo: bilkentId)
+        .limit(1)
+        .get()
+        .then((value) {
+          if (value.docs.isNotEmpty) {
+            value.docs.first.reference.update({
+              'companyEvaluationUploaded': companyEvaluationUploaded,
+            });
+          }
+        });
+  }
+
   /// Belirtilen kursa kayıtlı studentCourseları getir
   static Future<List<Map<String, dynamic>>> getStudentsFromCourses(String courseId) async {
     final snapshot = await _firestore
@@ -382,6 +398,40 @@ class DBHelper {
     }
     // Return empty list if no documents found
     return [];
+  }
+
+  static Future<List<Map<String, dynamic>>> getStudentCoursesWithCourseInfo() async {
+    final studentCoursesSnapshot = await _firestore.collection('StudentCourses').get();
+    List<Map<String, dynamic>> studentCoursesWithCourseInfo = [];
+
+    for (var doc in studentCoursesSnapshot.docs) {
+      final studentCourseData = doc.data();
+      final courseId = studentCourseData['courseId'];
+
+      final courseSnapshot = await _firestore
+          .collection('Course')
+          .where('courseId', isEqualTo: courseId)
+          .limit(1)
+          .get();
+
+      if (courseSnapshot.docs.isNotEmpty) {
+        final courseData = courseSnapshot.docs.first.data();
+        studentCoursesWithCourseInfo.add({
+          'name': studentCourseData['name'],
+          'bilkentId': studentCourseData['bilkentId'],
+          'companyEvaluationUploaded': studentCourseData['companyEvaluationUploaded'],
+          'course': {
+            'code': courseData['code'],
+            'courseId': courseData['courseId'],
+            'isActive': courseData['isActive'],
+            'semester': courseData['semester'],
+            'year': courseData['year'],
+          },
+        });
+      }
+    }
+
+    return studentCoursesWithCourseInfo;
   }
 
   // --- Submissions İşlemleri ---
