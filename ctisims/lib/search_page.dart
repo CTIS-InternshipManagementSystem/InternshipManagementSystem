@@ -1,13 +1,15 @@
-import 'package:flutter/material.dart';
-import 'submission_detail_page.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:html' as html;
+import 'submission_detail_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -54,18 +56,17 @@ class _SearchPageState extends State<SearchPage> {
     _filteredSubmissions = _studentSubmissions;
   }
 
+  // Automatically filter submissions based on input.
   void _searchSubmissions() {
     final bilkentId = _bilkentIdController.text;
     setState(() {
-      _filteredSubmissions = _studentSubmissions
-          .where((submission) => submission['bilkentId'] == bilkentId)
-          .toList();
-    });
-  }
-
-  void _updateFilteredSubmissions() {
-    setState(() {
-      _filteredSubmissions = _studentSubmissions;
+      if (bilkentId.isEmpty) {
+        _filteredSubmissions = _studentSubmissions; // Show all if input is empty.
+      } else {
+        _filteredSubmissions = _studentSubmissions
+            .where((submission) => submission['bilkentId']?.contains(bilkentId) ?? false)
+            .toList();
+      }
     });
   }
 
@@ -82,7 +83,7 @@ class _SearchPageState extends State<SearchPage> {
         final uploadTask = storageRef.putData(fileBytes);
         final snapshot = await uploadTask.whenComplete(() => null);
         final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("Dosya başarıyla yüklendi: $downloadUrl");
+        print("File uploaded successfully: $downloadUrl");
       } else {
         final file = File(filePath!);
         final destination = "$destinationBase/$fileName";
@@ -90,10 +91,10 @@ class _SearchPageState extends State<SearchPage> {
         final uploadTask = storageRef.putFile(file);
         final snapshot = await uploadTask.whenComplete(() => null);
         final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("Dosya başarıyla yüklendi: $downloadUrl");
+        print("File uploaded successfully: $downloadUrl");
       }
     } catch (e) {
-      print("Dosya yükleme sırasında bir hata oluştu: $e");
+      print("File upload error: $e");
     }
   }
 
@@ -116,6 +117,54 @@ class _SearchPageState extends State<SearchPage> {
     } catch (e) {
       print("Download error: $e");
     }
+  }
+
+  // Validator function for grade inputs.
+  String? _validateGrade(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter a grade';
+    }
+    final double? grade = double.tryParse(value);
+    if (grade == null) {
+      return 'Please enter a valid number';
+    }
+    if (grade < 0 || grade > 100) {
+      return 'Grade must be between 0 and 100';
+    }
+    return null;
+  }
+
+  Future<void> submitGrade(String grade, String studentName, String course) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://example.com/submit-grade'), // Replace with your backend URL
+        body: {
+          'studentName': studentName,
+          'grade': grade,
+          'course': course,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Grade submitted for $studentName')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit grade for $studentName')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error during grade submission: $e')),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _bilkentIdController.dispose();
+    super.dispose();
   }
 
   @override
@@ -142,7 +191,7 @@ class _SearchPageState extends State<SearchPage> {
               onChanged: (value) {
                 setState(() {
                   _selectedOption = value;
-                  _updateFilteredSubmissions();
+                  _searchSubmissions(); // Automatically filter when option changes
                 });
               },
             ),
@@ -153,7 +202,7 @@ class _SearchPageState extends State<SearchPage> {
               onChanged: (value) {
                 setState(() {
                   _selectedOption = value;
-                  _updateFilteredSubmissions();
+                  _searchSubmissions(); // Automatically filter when option changes
                 });
               },
             ),
@@ -165,11 +214,7 @@ class _SearchPageState extends State<SearchPage> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _searchSubmissions,
-              child: const Text('Search Student Submissions'),
+              onChanged: (_) => _searchSubmissions(), // Trigger search on text change
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -237,7 +282,7 @@ class _SearchPageState extends State<SearchPage> {
                               if (_uploadFilePath != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text('Seçilen dosya: $_uploadFilePath'),
+                                  child: Text('Selected file: $_uploadFilePath'),
                                 ),
                               const SizedBox(height: 8),
                               ElevatedButton(
@@ -323,17 +368,6 @@ class _SearchPageState extends State<SearchPage> {
                                 child: const Text('Upload'),
                               ),
                             ],
-                          ],
-                          if (_selectedOption == 'Search Student') ...[
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => SubmissionDetailPage(submission: submission)),
-                                );
-                              },
-                              child: const Text('View Submission'),
-                            ),
                           ],
                         ],
                       ),
