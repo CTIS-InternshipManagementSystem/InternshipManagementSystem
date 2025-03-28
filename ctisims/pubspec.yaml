@@ -46,6 +46,7 @@ dependencies:
   gcloud: ^0.8.18
   cloud_firestore: ^5.6.5
   intl: ^0.20.2
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:

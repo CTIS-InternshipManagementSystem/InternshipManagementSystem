@@ -1,11 +1,12 @@
+import 'package:ctisims/evaluate_page.dart';
+import 'package:flutter/material.dart';
+import 'package:ctisims/dbHelper.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:html' as html;
@@ -24,111 +25,141 @@ class _SearchPageState extends State<SearchPage> {
   Uint8List? _uploadFileBytes;
   bool _isUploading = false;
 
-  // Dummy data for student submissions
-  final List<Map<String, String>> _studentSubmissions = [
-    {
-      'semester': '2022-2023 Fall',
-      'course': 'CTIS310',
-      'studentName': 'John Doe',
-      'bilkentId': '1110001',
-      'lecturerName': 'Dr. Smith',
-      'submissionStatus': 'Submitted',
-      'companyEvaluation': 'Uploaded'
-    },
-    {
-      'semester': '2022-2023 Fall',
-      'course': 'CTIS290',
-      'studentName': 'Jane Doe',
-      'bilkentId': '1110002',
-      'lecturerName': 'Dr. Brown',
-      'submissionStatus': 'Not Submitted',
-      'companyEvaluation': 'Not Uploaded'
-    },
-  ];
-
-  List<Map<String, String>> _filteredSubmissions = [];
-
-  final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+  Future<List<Map<String, dynamic>>>? _futureStudentCourses;
 
   @override
   void initState() {
     super.initState();
-    _filteredSubmissions = _studentSubmissions;
+    _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
+    _bilkentIdController.addListener(() => _searchSubmissions(_bilkentIdController.text));
   }
 
   void _searchSubmissions(String query) {
     setState(() {
-      if (query.isEmpty) {
-        _filteredSubmissions = _studentSubmissions;
-      } else {
-        _filteredSubmissions = _studentSubmissions
-            .where((submission) => submission['bilkentId']?.contains(query) ?? false)
-            .toList();
-      }
+      _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo().then((submissions) {
+        if (query.isEmpty) {
+          return submissions;
+        } else {
+          return submissions.where((submission) => 
+            submission['bilkentId'].toString().startsWith(query)).toList();
+        }
+      });
     });
   }
 
   void _updateFilteredSubmissions() {
     setState(() {
-      _filteredSubmissions = _studentSubmissions;
+      _futureStudentCourses = DBHelper.getStudentCoursesWithCourseInfo();
     });
   }
 
-  Future<void> uploadFile({String? filePath, Uint8List? fileBytes}) async {
+  Future<void> uploadFile(String bilkentId, String name, String courseId, String year, String semester, String code) async {
     setState(() {
       _isUploading = true;
     });
 
     try {
       await Firebase.initializeApp();
-      String fileName = "CompanyEvaluation_22002357_Bilgehan_Demirkaya";
-      final String destinationBase = "2024-2025 Spring/CTIS310/Bilgehan_Demirkaya_22002357";
+      final String fileName = "CompanyEvaluation_${bilkentId}_$name";
+      final String destinationBase = "$year $semester/CTIS$code/${name}_$bilkentId";
       Reference storageRef;
 
       if (kIsWeb) {
-        if (fileBytes == null) throw Exception("No file bytes provided for web upload");
+        if (_uploadFileBytes == null) throw Exception("No file bytes provided for web upload");
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
-        final uploadTask = storageRef.putData(fileBytes);
+        final uploadTask = storageRef.putData(_uploadFileBytes!);
         final snapshot = await uploadTask.whenComplete(() => null);
         final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("File uploaded successfully: $downloadUrl");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("File uploaded successfully!")),
+        );
+        
+        // Update company evaluation status
+        await DBHelper.changeCompanyEvaluation(bilkentId, courseId, true);
+        _updateFilteredSubmissions();
       } else {
-        final file = File(filePath!);
+        if (_uploadFilePath == null) throw Exception("No file path provided for mobile upload");
+        final file = File(_uploadFilePath!);
         final destination = "$destinationBase/$fileName";
         storageRef = FirebaseStorage.instance.ref(destination);
         final uploadTask = storageRef.putFile(file);
         final snapshot = await uploadTask.whenComplete(() => null);
         final downloadUrl = await snapshot.ref.getDownloadURL();
-        print("File uploaded successfully: $downloadUrl");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("File uploaded successfully!")),
+        );
+        
+        // Update company evaluation status
+        await DBHelper.changeCompanyEvaluation(bilkentId, courseId, true);
+        _updateFilteredSubmissions();
       }
     } catch (e) {
-      print("Error during file upload: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error during file upload: $e")),
+      );
     } finally {
       setState(() {
         _isUploading = false;
+        _uploadFilePath = null;
+        _uploadFileBytes = null;
       });
     }
   }
 
-  Future<void> downloadFile(String fileName) async {
+  Future<void> downloadFile(String bilkentId, String name, String year, String semester, String code) async {
     try {
-      final String destination = "$destinationBase/$fileName";
+      final String fileName = "CompanyEvaluation_${bilkentId}_$name";
+      final String destinationBase = "$year $semester/CTIS$code/${name}_$bilkentId";
+      final destination = "$destinationBase/$fileName";
+      
       final ref = FirebaseStorage.instance.ref(destination);
       final downloadUrl = await ref.getDownloadURL();
+      
       if (kIsWeb) {
         html.AnchorElement anchor = html.AnchorElement(href: downloadUrl);
         anchor.download = fileName;
         anchor.click();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Download started")),
+        );
       } else {
         final response = await http.get(Uri.parse(downloadUrl));
         final Directory appDocDir = await getApplicationDocumentsDirectory();
         final File file = File('${appDocDir.path}/$fileName');
         await file.writeAsBytes(response.bodyBytes);
-        print("File downloaded to: ${file.path}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("File downloaded to: ${file.path}")),
+        );
       }
     } catch (e) {
-      print("Download error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Download error: $e")),
+      );
+    }
+  }
+
+  Future<void> deleteFile(String bilkentId, String name, String courseId, String year, String semester, String code) async {
+    try {
+      final String fileName = "CompanyEvaluation_${bilkentId}_$name";
+      final String destinationBase = "$year $semester/CTIS$code/${name}_$bilkentId";
+      final destination = "$destinationBase/$fileName";
+      
+      final ref = FirebaseStorage.instance.ref(destination);
+      await ref.delete();
+      
+      // Update company evaluation status
+      await DBHelper.changeCompanyEvaluation(bilkentId, courseId, false);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("File deleted successfully")),
+      );
+      
+      _updateFilteredSubmissions();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("File deletion error: $e")),
+      );
     }
   }
 
@@ -180,177 +211,135 @@ class _SearchPageState extends State<SearchPage> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-              onChanged: (value) {
-                _searchSubmissions(value);
-              },
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _filteredSubmissions.length,
-                itemBuilder: (context, index) {
-                  final submission = _filteredSubmissions[index];
-                  return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Semester: ${submission['semester']}'),
-                          const SizedBox(height: 4),
-                          Text('Course: ${submission['course']}'),
-                          const SizedBox(height: 4),
-                          Text('Student Name: ${submission['studentName']}'),
-                          const SizedBox(height: 4),
-                          Text('Bilkent ID: ${submission['bilkentId']}'),
-                          const SizedBox(height: 4),
-                          Text('Lecturer Name: ${submission['lecturerName']}'),
-                          const SizedBox(height: 4),
-                          Text('Submission Status: ${submission['submissionStatus']}'),
-                          const SizedBox(height: 16),
-                          if (_selectedOption == 'Uploading Company Evaluation Reports') ...[
-                            if (submission['companyEvaluation'] == 'Uploaded') ...[
-                              ElevatedButton(
-                                onPressed: () {
-                                  downloadFile("CompanyEvaluation_22002357_Bilgehan_Demirkaya");
-                                },
-                                child: const Text('Download Company Evaluation Report'),
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Implement delete logic
-                                },
-                                child: const Text('Delete Company Evaluation Report'),
-                              ),
-                            ] else ...[
-                              ElevatedButton(
-                                onPressed: () async {
-                                  if (kIsWeb) {
-                                    FilePickerResult? result = await FilePicker.platform.pickFiles();
-                                    if (result != null) {
-                                      setState(() {
-                                        _uploadFileBytes = result.files.single.bytes;
-                                        _uploadFilePath = result.files.single.name;
-                                      });
-                                    }
-                                  } else {
-                                    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
-                                    if (result != null) {
-                                      setState(() {
-                                        _uploadFilePath = result.files.single.path;
-                                      });
-                                    }
-                                  }
-                                },
-                                child: const Text('Choose File'),
-                              ),
-                              if (_uploadFilePath != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text('Selected file: $_uploadFilePath'),
-                                ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: _isUploading
-                                    ? null
-                                    : () async {
-                                        if (kIsWeb) {
-                                          if (_uploadFileBytes != null) {
-                                            try {
-                                              await uploadFile(fileBytes: _uploadFileBytes);
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text("Success"),
-                                                  content: const Text("File uploaded successfully."),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                  ],
-                                                ),
-                                              );
-                                            } catch (e) {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text("Error"),
-                                                  content: const Text("File not uploaded."),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                  ],
-                                                ),
-                                              );
-                                            }
-                                          } else {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text("Error"),
-                                                content: const Text("No file selected."),
-                                                actions: [
-                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                ],
-                                              ),
-                                            );
-                                          }
-                                        } else {
-                                          if (_uploadFilePath != null) {
-                                            try {
-                                              await uploadFile(filePath: _uploadFilePath);
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text("Success"),
-                                                  content: const Text("File uploaded successfully."),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                  ],
-                                                ),
-                                              );
-                                            } catch (e) {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: const Text("Error"),
-                                                  content: const Text("File not uploaded."),
-                                                  actions: [
-                                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                  ],
-                                                ),
-                                              );
-                                            }
-                                          } else {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text("Error"),
-                                                content: const Text("No file selected."),
-                                                actions: [
-                                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
-                                                ],
-                                              ),
-                                            );
-                                          }
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _futureStudentCourses,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(child: Text("Error: ${snapshot.error}"));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text("No students found"));
+                  }
+                  
+                  final studentCourses = snapshot.data!;
+                  return ListView.builder(
+                    itemCount: studentCourses.length,
+                    itemBuilder: (context, index) {
+                      final submission = studentCourses[index];
+                      final course = submission['course'];
+                      final bilkentId = submission['bilkentId'] ?? '';
+                      final name = submission['name'] ?? '';
+                      final courseId = course['courseId'] ?? '';
+                      final year = course['year'] ?? '';
+                      final semester = course['semester'] ?? '';
+                      final code = course['code'] ?? '';
+                      final companyEvaluationUploaded = submission['companyEvaluationUploaded'] ?? false;
+                      
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Year: $year'),
+                              const SizedBox(height: 4),
+                              Text('Semester: $semester'),
+                              const SizedBox(height: 4),
+                              Text('Course: CTIS $code'),
+                              const SizedBox(height: 4),
+                              Text('Student Name: $name'),
+                              const SizedBox(height: 4),
+                              Text('Bilkent ID: $bilkentId'),
+                              const SizedBox(height: 4),
+                              Text('Company Evaluation Uploaded: $companyEvaluationUploaded'),
+                              const SizedBox(height: 16),
+                              
+                              if (_selectedOption == 'Uploading Company Evaluation Reports') ...[
+                                if (companyEvaluationUploaded) ...[
+                                  ElevatedButton(
+                                    onPressed: () => downloadFile(bilkentId, name, year, semester, code),
+                                    child: const Text('Download Company Evaluation Report'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: () => deleteFile(bilkentId, name, courseId, year, semester, code),
+                                    child: const Text('Delete Company Evaluation Report'),
+                                  ),
+                                ] else ...[
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      if (kIsWeb) {
+                                        FilePickerResult? result = await FilePicker.platform.pickFiles();
+                                        if (result != null) {
+                                          setState(() {
+                                            _uploadFileBytes = result.files.single.bytes;
+                                            _uploadFilePath = result.files.single.name;
+                                          });
                                         }
-                                      },
-                                child: _isUploading
-                                    ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          strokeWidth: 2,
+                                      } else {
+                                        FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+                                        if (result != null) {
+                                          setState(() {
+                                            _uploadFilePath = result.files.single.path;
+                                          });
+                                        }
+                                      }
+                                    },
+                                    child: const Text('Choose File'),
+                                  ),
+                                  if (_uploadFilePath != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Text('Selected file: $_uploadFilePath'),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: _isUploading 
+                                      ? null 
+                                      : () => uploadFile(bilkentId, name, courseId, year, semester, code),
+                                    child: _isUploading
+                                      ? const CircularProgressIndicator()
+                                      : const Text('Upload'),
+                                  ),
+                                ],
+                              ],
+                              
+                              if (_selectedOption == 'Search Student') ...[
+                                ElevatedButton(
+                                  onPressed: () {
+                                    final submissionMap = {
+                                      'bilkentId': bilkentId,
+                                      'courseId': courseId,
+                                      'studentName': name,
+                                      'email': submission['email'] ?? '',
+                                      'course': 'CTIS$code',
+                                      'companyEvaluation': companyEvaluationUploaded ? 'Uploaded' : 'Not Uploaded'
+                                    };
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EvaluatePage(
+                                          submission: submissionMap.map((k, v) => MapEntry(k, v.toString())),
                                         ),
-                                      )
-                                    : const Text('Upload'),
-                              ),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('View Submission'),
+                                ),
+                              ],
                             ],
-                          ],
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
