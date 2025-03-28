@@ -5,10 +5,11 @@ import 'firebase_options.dart'; // flutterfire configure ile oluşturulan dosya
 import 'login_page.dart';
 import 'home_page.dart';
 import 'package:provider/provider.dart';
+import 'themes/Theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -17,8 +18,16 @@ void main() async {
   } catch (e) {
     debugPrint("Error initializing Firebase: $e");
   }
-  
-  runApp(const MyApp());
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => HomePageModel()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -26,15 +35,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => HomePageModel(),
-      child: MaterialApp(
-        title: 'CTIS IMS',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
-        home: const LoginPage(),
-      ),
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return MaterialApp(
+      title: 'CTIS IMS',
+      debugShowCheckedModeBanner: false,
+      themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      home: const LoginPage(),
     );
   }
 }

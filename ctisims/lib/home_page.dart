@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:async/async.dart';
 import 'package:intl/intl.dart';
+import 'package:ctisims/themes/Theme_provider.dart';
 
 class HomePageModel extends ChangeNotifier {
   String? selectedYear;
@@ -192,6 +193,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS'),
@@ -214,6 +218,17 @@ class _HomePageState extends State<HomePage> {
           TextButton(
             onPressed: () {},
             child: Text('${widget.userData.username}', style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
+          //darkmode
+          IconButton(
+            icon: Icon(
+            isDark ? Icons.dark_mode : Icons.light_mode,
+            color: Colors.grey, // Consistent grey color everywhere
+              ),
+              tooltip: 'Toggle Dark Mode',
+              onPressed: () {
+            themeProvider.toggleTheme();
+              },
           ),
           //Logout button
           TextButton(
