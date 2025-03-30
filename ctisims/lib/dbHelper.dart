@@ -7,21 +7,28 @@ class DBHelper {
   // Temel Firestore işlemleri
 
   /// Yeni belge ekler ve [DocumentReference] döner.
-  static Future<DocumentReference> insert(String collection, Map<String, dynamic> data) async {
+  static Future<DocumentReference> insert(
+    String collection,
+    Map<String, dynamic> data,
+  ) async {
     return await _firestore.collection(collection).add(data);
   }
 
   /// Belirtilen koleksiyondaki tüm belgeleri getirir.
   static Future<List<Map<String, dynamic>>> query(String collection) async {
-    final QuerySnapshot snapshot = await _firestore.collection(collection).get();
-    return snapshot.docs.map((doc) => {
-      'id': doc.id,
-      ...doc.data() as Map<String, dynamic>,
-    }).toList();
+    final QuerySnapshot snapshot =
+        await _firestore.collection(collection).get();
+    return snapshot.docs
+        .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+        .toList();
   }
 
   /// Belirtilen belgeyi günceller.
-  static Future<void> update(String collection, String docId, Map<String, dynamic> data) async {
+  static Future<void> update(
+    String collection,
+    String docId,
+    Map<String, dynamic> data,
+  ) async {
     await _firestore.collection(collection).doc(docId).update(data);
   }
 
@@ -34,11 +41,12 @@ class DBHelper {
 
   /// Login: Email'e göre User koleksiyonundan eşleşen kullanıcıyı getirir.
   static Future<Map<String, dynamic>> login(String email) async {
-    final snapshot = await _firestore
-        .collection('User')
-        .where('email', isEqualTo: email)
-        .limit(1)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('User')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
     if (snapshot.docs.isNotEmpty) {
       final user = snapshot.docs.first.data();
       return {
@@ -51,23 +59,31 @@ class DBHelper {
   }
 
   /// Yeni kullanıcı ekler.
-  static Future<void> addUser(String name, String email, String bilkentId, String role, String supervisor) async {
+  static Future<void> addUser(
+    String name,
+    String email,
+    String bilkentId,
+    String role,
+    String supervisor,
+  ) async {
     // Check if email is unique
-    final emailSnapshot = await _firestore
-        .collection('User')
-        .where('email', isEqualTo: email)
-        .limit(1)
-        .get();
+    final emailSnapshot =
+        await _firestore
+            .collection('User')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
     if (emailSnapshot.docs.isNotEmpty) {
       throw Exception('Email already exists');
     }
 
     // Check if bilkentId is unique
-    final bilkentIdSnapshot = await _firestore
-        .collection('User')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .limit(1)
-        .get();
+    final bilkentIdSnapshot =
+        await _firestore
+            .collection('User')
+            .where('bilkentId', isEqualTo: bilkentId)
+            .limit(1)
+            .get();
     if (bilkentIdSnapshot.docs.isNotEmpty) {
       throw Exception('Bilkent ID already exists');
     }
@@ -84,31 +100,55 @@ class DBHelper {
 
   /// Belirtilen bilkentId'ye sahip kullanıcıyı getirir.
   static Future<Map<String, dynamic>> getStudentInfo(String bilkentId) async {
-    final snapshot = await _firestore
-        .collection('User')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .limit(1)
-        .get();
-    if (snapshot.docs.isNotEmpty) {
+    debugPrint("Getting student info for bilkentId: $bilkentId");
+
+    try {
+      final snapshot =
+          await _firestore
+              .collection('User')
+              .where('bilkentId', isEqualTo: bilkentId)
+              .limit(1)
+              .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final userData = snapshot.docs.first.data();
+        debugPrint("Found student: ${userData['name']}");
+        return {'id': snapshot.docs.first.id, ...userData};
+      }
+
+      debugPrint("No student found with bilkentId: $bilkentId");
+      // Return a default map with placeholder values instead of throwing exception
       return {
-        'id': snapshot.docs.first.id,
-        ...snapshot.docs.first.data() as Map<String, dynamic>,
+        'id': bilkentId,
+        'name': 'Unknown Student ($bilkentId)',
+        'email': '',
+        'bilkentId': bilkentId,
+        'role': 'Student',
+      };
+    } catch (e) {
+      debugPrint("Error getting student info: $e");
+      // Return a default map in case of error
+      return {
+        'id': bilkentId,
+        'name': 'Error retrieving student',
+        'email': '',
+        'bilkentId': bilkentId,
+        'role': 'Student',
       };
     }
-    throw Exception('Failed to fetch student info');
   }
 
   //Get all students
   static Future<List<Map<String, dynamic>>> getAllStudents() async {
-    final snapshot = await _firestore
-        .collection('User')
-        .where('role', isEqualTo: 'Student')
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('User')
+            .where('role', isEqualTo: 'Student')
+            .get();
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+          .toList();
     }
     throw Exception('Failed to fetch student info');
   }
@@ -119,25 +159,29 @@ class DBHelper {
   static Future<List<Map<String, dynamic>>> getAllCourses() async {
     final snapshot = await _firestore.collection('Course').get();
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+          .toList();
     }
     throw Exception('Failed to fetch course info');
   }
 
-  /// Aktif (isActive: true) kursları getirir. 
-  static Future<List<Map<String, dynamic>>> getCourseForStudent(String bilkentId) async {
+  /// Aktif (isActive: true) kursları getirir.
+  static Future<List<Map<String, dynamic>>> getCourseForStudent(
+    String bilkentId,
+  ) async {
     List<String> courseIds = [];
-    final snapshot2 = await _firestore
-        .collection('StudentCourses')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .where('isActive', isEqualTo: true)
-        .get();
+    final snapshot2 =
+        await _firestore
+            .collection('StudentCourses')
+            .where('bilkentId', isEqualTo: bilkentId)
+            .where('isActive', isEqualTo: true)
+            .get();
     if (snapshot2.docs.isNotEmpty) {
       for (var doc in snapshot2.docs) {
-        print('Document data: ${doc.data()}'); // Hata ayıklama için belge verilerini yazdırın
+        print(
+          'Document data: ${doc.data()}',
+        ); // Hata ayıklama için belge verilerini yazdırın
         if (doc.data().containsKey('courseId')) {
           courseIds.add(doc.data()['courseId'].toString());
         } else {
@@ -150,36 +194,39 @@ class DBHelper {
 
     debugPrint("CourseIds: $courseIds");
 
-    final snapshot = await _firestore
-        .collection('Course')
-        .where('isActive', isEqualTo: true)
-        .where('courseId', whereIn: courseIds)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('Course')
+            .where('isActive', isEqualTo: true)
+            .where('courseId', whereIn: courseIds)
+            .get();
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+          .toList();
     }
     throw Exception('Failed to fetch active course info');
   }
 
   /// Belirtilen courseCode için aktif kursu (Course koleksiyonunda) getirir.
   static Future<DocumentSnapshot?> getActiveCourseDoc(String code) async {
-    final snapshot = await _firestore
-        .collection('Course')
-        .where('code', isEqualTo: code)
-        .where('isActive', isEqualTo: true)
-        .limit(1)
-        .get();
-        
+    final snapshot =
+        await _firestore
+            .collection('Course')
+            .where('code', isEqualTo: code)
+            .where('isActive', isEqualTo: true)
+            .limit(1)
+            .get();
+
     if (snapshot.docs.isNotEmpty) {
       debugPrint("Found active course with code: $code");
       return snapshot.docs.first;
     }
-    
-    debugPrint("No active course found for code: $code. Found ${snapshot.size} courses");
-    
+
+    debugPrint(
+      "No active course found for code: $code. Found ${snapshot.size} courses",
+    );
+
     // Get all courses for debugging
     final allCourses = await _firestore.collection('Course').get();
     debugPrint("All courses (${allCourses.docs.length}):");
@@ -187,21 +234,25 @@ class DBHelper {
       final data = doc.data();
       debugPrint("Course: code=${data['code']}, isActive=${data['isActive']}");
     }
-    
+
     return null;
   }
 
   /// Kursu pasif hale getirir (isActive: false).
   static Future<void> deactiveCourse(String courseId) async {
-    await _firestore.collection('Course').doc(courseId).update({'isActive': false});
-    await _firestore.collection('StudentCourses').where('courseId', isEqualTo: courseId).get().then((value) {
-      for (var doc in value.docs) {
-        doc.reference.update({'isActive': false});
-      }
+    await _firestore.collection('Course').doc(courseId).update({
+      'isActive': false,
     });
+    await _firestore
+        .collection('StudentCourses')
+        .where('courseId', isEqualTo: courseId)
+        .get()
+        .then((value) {
+          for (var doc in value.docs) {
+            doc.reference.update({'isActive': false});
+          }
+        });
   }
-
-
 
   /// Creates a new course and automatically creates assignments.
   /// Parameters:
@@ -209,29 +260,41 @@ class DBHelper {
   ///   year: e.g. "2020-2021", "2022-2023", etc.
   ///   semester: e.g. "Fall" or "Spring"
   ///   isActive: should be true when creating a new course.
-  static Future<void> createCourse(String course, String year, String semester, bool isActive) async {
-        // Use numeric course code: if course is "CTIS310", code becomes "310"; if "CTIS290", becomes "290".
-    final String numericCode = course.startsWith("CTIS") ? course.substring(4) : course;
+  static Future<void> createCourse(
+    String course,
+    String year,
+    String semester,
+    bool isActive,
+  ) async {
+    // Use numeric course code: if course is "CTIS310", code becomes "310"; if "CTIS290", becomes "290".
+    final String numericCode =
+        course.startsWith("CTIS") ? course.substring(4) : course;
     //Check is there any isActive true course
-    final QuerySnapshot activeCourses = await _firestore
-        .collection('Course')
-        .where('isActive', isEqualTo: true)
-        .where('code', isEqualTo: numericCode)
-        .get();
+    final QuerySnapshot activeCourses =
+        await _firestore
+            .collection('Course')
+            .where('isActive', isEqualTo: true)
+            .where('code', isEqualTo: numericCode)
+            .get();
     if (activeCourses.docs.isNotEmpty) {
       if (isActive)
-        throw Exception("There is already an active course. Deactivate it first.");
+        throw Exception(
+          "There is already an active course. Deactivate it first.",
+        );
     }
 
     // Check for duplicate course in the same year and semester.
-    final QuerySnapshot duplicate = await _firestore
-        .collection('Course')
-        .where('year', isEqualTo: year)
-        .where('semester', isEqualTo: semester)
-        .where('code', isEqualTo: numericCode)
-        .get();
+    final QuerySnapshot duplicate =
+        await _firestore
+            .collection('Course')
+            .where('year', isEqualTo: year)
+            .where('semester', isEqualTo: semester)
+            .where('code', isEqualTo: numericCode)
+            .get();
     if (duplicate.docs.isNotEmpty) {
-      throw Exception("A course with code $course for $year $semester already exists.");
+      throw Exception(
+        "A course with code $course for $year $semester already exists.",
+      );
     }
     // Create a new course document.
     final DocumentReference newCourse = _firestore.collection('Course').doc();
@@ -246,7 +309,8 @@ class DBHelper {
     // Automatically create assignments for the course.
     if (numericCode == "290") {
       // Create Report assignment for CTIS290.
-      final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+      final DocumentReference newAssignment =
+          _firestore.collection('Assignment').doc();
       await newAssignment.set({
         'courseCode': "290",
         'courseId': newCourse.id,
@@ -258,22 +322,28 @@ class DBHelper {
     } else if (numericCode == "310") {
       // Create Follow Up 1 assignment for CTIS310.
       for (int i = 1; i <= 5; i++) {
-        final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+        final DocumentReference newAssignment =
+            _firestore.collection('Assignment').doc();
         await newAssignment.set({
           'courseCode': "310",
           'courseId': newCourse.id,
           // Deadline: 30 days apart for each follow up.
-          'deadline': Timestamp.fromDate(DateTime.now().toUtc().add(Duration(days: 20 * i))),
+          'deadline': Timestamp.fromDate(
+            DateTime.now().toUtc().add(Duration(days: 20 * i)),
+          ),
           'name': "Follow Up $i",
           'id': newAssignment.id,
-        });        
+        });
       }
-      final DocumentReference newAssignment = _firestore.collection('Assignment').doc();
-        await newAssignment.set({
+      final DocumentReference newAssignment =
+          _firestore.collection('Assignment').doc();
+      await newAssignment.set({
         'courseCode': "310",
         'courseId': newCourse.id,
         // Deadline: 30 days apart for each follow up.
-        'deadline': Timestamp.fromDate(DateTime.now().toUtc().add(Duration(days: 120))),
+        'deadline': Timestamp.fromDate(
+          DateTime.now().toUtc().add(Duration(days: 120)),
+        ),
         'name': "Report",
         'id': newAssignment.id,
       });
@@ -285,18 +355,24 @@ class DBHelper {
 
   /// Verilen courseCode'e sahip aktif kursu bulup, ilgili Assignment belgesinde
   /// [assignmentName] eşleşen kaydın deadline'ını günceller.
-  static Future<void> changeDeadlineSettings(String courseCode, String assignmentName, DateTime deadline) async {
+  static Future<void> changeDeadlineSettings(
+    String courseCode,
+    String assignmentName,
+    DateTime deadline,
+  ) async {
     final courseDoc = await getActiveCourseDoc(courseCode);
     if (courseDoc == null) {
       throw Exception('No active course found for code $courseCode');
     }
-    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
-    final snapshot = await _firestore
-        .collection('Assignment')
-        .where('courseId', isEqualTo: courseId)
-        .where('name', isEqualTo: assignmentName)
-        .limit(1)
-        .get();
+    final courseId =
+        (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final snapshot =
+        await _firestore
+            .collection('Assignment')
+            .where('courseId', isEqualTo: courseId)
+            .where('name', isEqualTo: assignmentName)
+            .limit(1)
+            .get();
     if (snapshot.docs.isNotEmpty) {
       await snapshot.docs.first.reference.update({
         'deadline': Timestamp.fromDate(deadline),
@@ -307,21 +383,24 @@ class DBHelper {
   }
 
   /// Aktif kursa ait Assignment'ları getirir.
-  static Future<List<Map<String, dynamic>>> getActiveCourseAssignments(String code) async {
+  static Future<List<Map<String, dynamic>>> getActiveCourseAssignments(
+    String code,
+  ) async {
     final courseDoc = await getActiveCourseDoc(code);
     if (courseDoc == null) {
       return [];
     }
-    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
-    final snapshot = await _firestore
-        .collection('Assignment')
-        .where('courseId', isEqualTo: courseId)
-        .get();
+    final courseId =
+        (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final snapshot =
+        await _firestore
+            .collection('Assignment')
+            .where('courseId', isEqualTo: courseId)
+            .get();
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+          .toList();
     }
     return [];
   }
@@ -333,18 +412,26 @@ class DBHelper {
       yield [];
       return;
     }
-    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final courseId =
+        (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
     yield* _firestore
         .collection('Assignment')
         .where('courseId', isEqualTo: courseId)
         .where('courseCode', isEqualTo: '310')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => {
-          'id': doc.id,
-          ...doc.data() as Map<String, dynamic>,
-        }).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map(
+                    (doc) => {
+                      'id': doc.id,
+                      ...doc.data() as Map<String, dynamic>,
+                    },
+                  )
+                  .toList(),
+        );
   }
-  
+
   /// Streams current deadlines for CTIS 290.
   static Stream<List<Map<String, dynamic>>> streamCurrentDeadline290() async* {
     final courseDoc = await getActiveCourseDoc("290");
@@ -352,56 +439,232 @@ class DBHelper {
       yield [];
       return;
     }
-    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final courseId =
+        (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
     yield* _firestore
         .collection('Assignment')
         .where('courseId', isEqualTo: courseId)
         .where('courseCode', isEqualTo: '290')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => {
-          'id': doc.id,
-          ...doc.data() as Map<String, dynamic>,
-        }).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map(
+                    (doc) => {
+                      'id': doc.id,
+                      ...doc.data() as Map<String, dynamic>,
+                    },
+                  )
+                  .toList(),
+        );
   }
 
   // --- Grade İşlemleri ---
 
   //Get all grades according to course with student name and id
-  static Future<Map<String, dynamic>> getAllGradesWithStudentInfo(String courseId) async {
-    final snapshot = await _firestore
-        .collection('Grade')
-        .where('courseId', isEqualTo: courseId)
-        .get();
-    if (snapshot.docs.isEmpty) {
-      return {'grades': {}};
-    }
-    Map<String, Map<String, dynamic>> grades = {};
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final student = await getStudentInfo(data['bilkentId']);
-      grades[student['id']] ??= {
-        'name': student['name'],
-        'grades': {},
-      };
-      // Fetch the assignment document to get the name (e.g. "Follow Up 3")
-      final assignmentDoc = await _firestore.collection('Assignment').doc(data['assignmentId']).get();
-      if (assignmentDoc.exists) {
-        final assignmentData = assignmentDoc.data()!;
-        final assignmentName = assignmentData['name'] as String;
-        grades[student['id']]!['grades'][assignmentName] = data['grade'];
+  static Future<Map<String, dynamic>> getAllGradesWithStudentInfo(
+    String courseId,
+  ) async {
+    debugPrint("Getting grades for courseId: $courseId");
+
+    try {
+      // First, check if the courseId is valid by looking it up in the Course collection
+      final courseSnapshot =
+          await _firestore
+              .collection('Course')
+              .where('courseId', isEqualTo: courseId)
+              .limit(1)
+              .get();
+
+      if (courseSnapshot.docs.isEmpty) {
+        debugPrint("Warning: No course found with courseId: $courseId");
+
+        // Try to get course by document ID as fallback
+        final courseDocSnapshot =
+            await _firestore.collection('Course').doc(courseId).get();
+
+        if (courseDocSnapshot.exists) {
+          final courseData = courseDocSnapshot.data()!;
+          debugPrint(
+            "Found course by document ID: ${courseData['code']} (${courseData['year']} ${courseData['semester']})",
+          );
+          // Continue with the document ID approach
+        } else {
+          debugPrint(
+            "Error: Could not find course with ID: $courseId (not even as document ID)",
+          );
+          return {'grades': {}, 'error': 'Course not found'};
+        }
+      } else {
+        final courseData = courseSnapshot.docs.first.data();
+        debugPrint(
+          "Found course: ${courseData['code']} (${courseData['year']} ${courseData['semester']})",
+        );
       }
+
+      // Now query for grades with this courseId
+      final snapshot =
+          await _firestore
+              .collection('Grade')
+              .where('courseId', isEqualTo: courseId)
+              .get();
+
+      debugPrint(
+        "Found ${snapshot.docs.length} grade documents for courseId: $courseId",
+      );
+
+      if (snapshot.docs.isEmpty) {
+        // If we don't find any grades with this ID, try another approach
+        // Maybe the courseId is stored as the document ID in the Grade collection
+        final altSnapshot = await _firestore.collection('Grade').get();
+
+        debugPrint(
+          "Searching among all ${altSnapshot.docs.length} grade documents",
+        );
+
+        // Filter manually
+        final matchingDocs =
+            altSnapshot.docs.where((doc) {
+              final data = doc.data();
+              return data['courseId'] == courseId;
+            }).toList();
+
+        if (matchingDocs.isNotEmpty) {
+          debugPrint(
+            "Found ${matchingDocs.length} matching grade documents after manual filtering",
+          );
+
+          Map<String, Map<String, dynamic>> grades = {};
+          for (var doc in matchingDocs) {
+            final data = doc.data();
+            debugPrint("Processing grade document: ${doc.id}, data: $data");
+
+            try {
+              final student = await getStudentInfo(data['bilkentId']);
+              debugPrint(
+                "Retrieved student info: ${student['name']} (${student['bilkentId']})",
+              );
+
+              // Use bilkentId as the map key
+              final bilkentId = student['bilkentId'];
+              grades[bilkentId] ??= {'name': student['name'], 'grades': {}};
+
+              // Process the assignment
+              await _processAssignmentAndGrade(grades, student, data);
+            } catch (e) {
+              debugPrint("Error processing grade document: $e");
+            }
+          }
+
+          debugPrint("Returning grades for ${grades.length} students");
+          return {'grades': grades};
+        } else {
+          debugPrint(
+            "No grades found for courseId: $courseId even after manual filtering",
+          );
+          return {'grades': {}};
+        }
+      }
+
+      Map<String, Map<String, dynamic>> grades = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        debugPrint("Processing grade document: ${doc.id}, data: $data");
+
+        try {
+          final student = await getStudentInfo(data['bilkentId']);
+          debugPrint(
+            "Retrieved student info: ${student['name']} (${student['bilkentId']})",
+          );
+
+          // Use bilkentId as the map key
+          final bilkentId = student['bilkentId'];
+          grades[bilkentId] ??= {'name': student['name'], 'grades': {}};
+
+          // Process the assignment
+          await _processAssignmentAndGrade(grades, student, data);
+        } catch (e) {
+          debugPrint("Error processing grade document: $e");
+        }
+      }
+
+      debugPrint("Returning grades for ${grades.length} students");
+      return {'grades': grades};
+    } catch (e) {
+      debugPrint("Error in getAllGradesWithStudentInfo: $e");
+      return {'grades': {}, 'error': e.toString()};
     }
-    return {'grades': grades};
+  }
+
+  // Helper method to process assignment and grade data
+  static Future<void> _processAssignmentAndGrade(
+    Map<String, Map<String, dynamic>> grades,
+    Map<String, dynamic> student,
+    Map<String, dynamic> data,
+  ) async {
+    // Attempt to fetch the assignment document
+    final assignmentId = data['assignmentId'];
+    final assignmentDoc =
+        await _firestore.collection('Assignment').doc(assignmentId).get();
+
+    String assignmentName;
+    if (assignmentDoc.exists) {
+      final assignmentData = assignmentDoc.data()!;
+      assignmentName = assignmentData['name'] as String;
+      debugPrint("Found assignment: $assignmentName");
+    } else {
+      debugPrint(
+        "Assignment document not found for ID: $assignmentId, using ID as fallback",
+      );
+
+      // Fallback: Try to determine assignment name based on assignmentId
+      if (assignmentId == "1") {
+        assignmentName = "Follow Up 1";
+      } else if (assignmentId == "2") {
+        assignmentName = "Follow Up 2";
+      } else if (assignmentId == "3") {
+        assignmentName = "Follow Up 3";
+      } else if (assignmentId == "4") {
+        assignmentName = "Follow Up 4";
+      } else if (assignmentId == "5") {
+        assignmentName = "Follow Up 5";
+      } else if (assignmentId == "6" ||
+          assignmentId.toLowerCase() == "report") {
+        assignmentName = "Report";
+      } else if (assignmentId.toLowerCase().contains("company")) {
+        assignmentName = "Company Evaluation";
+      } else {
+        // If we can't determine the name, use the ID with a prefix
+        assignmentName = "Assignment $assignmentId";
+      }
+
+      debugPrint("Using fallback assignment name: $assignmentName");
+    }
+
+    final grade = data['grade'];
+    debugPrint("Assignment: $assignmentName, Grade: $grade");
+
+    // Use bilkentId as the key instead of Firestore document ID
+    final bilkentId = student['bilkentId'];
+    grades[bilkentId] ??= {'name': student['name'], 'grades': {}};
+    grades[bilkentId]!['grades'][assignmentName] = grade;
   }
 
   /// Yeni not ekler (Grade koleksiyonu).
-  static Future<void> enterGrade(String bilkentId, String courseId, String assignmentName, double grade) async {
+  static Future<void> enterGrade(
+    String bilkentId,
+    String courseId,
+    String assignmentName,
+    double grade,
+  ) async {
     final assingment = await getAssignmentwithName(assignmentName, courseId);
-    
+
     if (assingment.isEmpty) {
-      throw Exception('Assignment not found for name: $assignmentName and courseId: $courseId');
+      throw Exception(
+        'Assignment not found for name: $assignmentName and courseId: $courseId',
+      );
     }
-    
+
     var doc = await _firestore.collection('Grade');
     doc.add({
       'bilkentId': bilkentId,
@@ -413,23 +676,25 @@ class DBHelper {
 
   /// Belirtilen kursa ait tüm notları getirir.
   static Future<Map<String, dynamic>> getAllGrades(String courseId) async {
-    final snapshot = await _firestore
-        .collection('Grade')
-        .where('courseId', isEqualTo: courseId)
-        .get();
+    final snapshot =
+        await _firestore
+            .collection('Grade')
+            .where('courseId', isEqualTo: courseId)
+            .get();
     if (snapshot.docs.isNotEmpty) {
       Map<String, Map<String, dynamic>> grades = {};
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final student = await getStudentInfo(data['bilkentId']);
-        final assignmentDoc = await _firestore.collection('Assignment').doc(data['assignmentId']).get();
+        final assignmentDoc =
+            await _firestore
+                .collection('Assignment')
+                .doc(data['assignmentId'])
+                .get();
         if (assignmentDoc.exists) {
           final assignmentData = assignmentDoc.data()!;
           final assignmentName = assignmentData['name'] as String;
-          grades[student['id']] ??= {
-            'name': student['name'],
-            'grades': {},
-          };
+          grades[student['id']] ??= {'name': student['name'], 'grades': {}};
           grades[student['id']]!['grades'][assignmentName] = data['grade'];
         }
       }
@@ -441,8 +706,13 @@ class DBHelper {
   // --- StudentCourses İşlemleri ---
 
   //Change company Evaluation
-  static Future<void> changeCompanyEvaluation(String bilkentId, String courseId, bool companyEvaluationUploaded) async {
-    await _firestore.collection('StudentCourses')
+  static Future<void> changeCompanyEvaluation(
+    String bilkentId,
+    String courseId,
+    bool companyEvaluationUploaded,
+  ) async {
+    await _firestore
+        .collection('StudentCourses')
         .where('courseId', isEqualTo: courseId)
         .where('bilkentId', isEqualTo: bilkentId)
         .limit(1)
@@ -457,41 +727,47 @@ class DBHelper {
   }
 
   /// Belirtilen kursa kayıtlı studentCourseları getir
-  static Future<List<Map<String, dynamic>>> getStudentsFromCourses(String courseId) async {
-    final snapshot = await _firestore
-        .collection('StudentCourses')
-        .where('courseId', isEqualTo: courseId)
-        .get();
+  static Future<List<Map<String, dynamic>>> getStudentsFromCourses(
+    String courseId,
+  ) async {
+    final snapshot =
+        await _firestore
+            .collection('StudentCourses')
+            .where('courseId', isEqualTo: courseId)
+            .get();
     if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.map((doc) => {
-        'id': doc.id,
-        ...doc.data() as Map<String, dynamic>,
-      }).toList();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+          .toList();
     }
     // Return empty list if no documents found
     return [];
   }
 
-  static Future<List<Map<String, dynamic>>> getStudentCoursesWithCourseInfo() async {
-    final studentCoursesSnapshot = await _firestore.collection('StudentCourses').get();
+  static Future<List<Map<String, dynamic>>>
+  getStudentCoursesWithCourseInfo() async {
+    final studentCoursesSnapshot =
+        await _firestore.collection('StudentCourses').get();
     List<Map<String, dynamic>> studentCoursesWithCourseInfo = [];
 
     for (var doc in studentCoursesSnapshot.docs) {
       final studentCourseData = doc.data();
       final courseId = studentCourseData['courseId'];
 
-      final courseSnapshot = await _firestore
-          .collection('Course')
-          .where('courseId', isEqualTo: courseId)
-          .limit(1)
-          .get();
+      final courseSnapshot =
+          await _firestore
+              .collection('Course')
+              .where('courseId', isEqualTo: courseId)
+              .limit(1)
+              .get();
 
       if (courseSnapshot.docs.isNotEmpty) {
         final courseData = courseSnapshot.docs.first.data();
         studentCoursesWithCourseInfo.add({
           'name': studentCourseData['name'],
           'bilkentId': studentCourseData['bilkentId'],
-          'companyEvaluationUploaded': studentCourseData['companyEvaluationUploaded'],
+          'companyEvaluationUploaded':
+              studentCourseData['companyEvaluationUploaded'],
           'course': {
             'code': courseData['code'],
             'courseId': courseData['courseId'],
@@ -507,29 +783,36 @@ class DBHelper {
   }
 
   //Add student to StudentCourses
-  static Future<void> addStudentToCourse(String bilkentId, String courseId, String name) async {
-    final existingAssignment = await _firestore
-        .collection('StudentCourses')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .where('courseId', isEqualTo: courseId)
-        .limit(1)
-        .get();
+  static Future<void> addStudentToCourse(
+    String bilkentId,
+    String courseId,
+    String name,
+  ) async {
+    final existingAssignment =
+        await _firestore
+            .collection('StudentCourses')
+            .where('bilkentId', isEqualTo: bilkentId)
+            .where('courseId', isEqualTo: courseId)
+            .limit(1)
+            .get();
 
     if (existingAssignment.docs.isNotEmpty) {
       throw Exception("User is already assigned to that course.");
     }
 
     bool isActive = false;
-    final courseSnapshot = await _firestore
-          .collection('Course')
-          .where('courseId', isEqualTo: courseId)
-          .limit(1)
-          .get();
+    final courseSnapshot =
+        await _firestore
+            .collection('Course')
+            .where('courseId', isEqualTo: courseId)
+            .limit(1)
+            .get();
 
     if (courseSnapshot.docs.isNotEmpty) {
       isActive = courseSnapshot.docs.first.data()['isActive'];
     }
-    final courseStudentDoc =await _firestore.collection('StudentCourses').doc();
+    final courseStudentDoc =
+        await _firestore.collection('StudentCourses').doc();
     await courseStudentDoc.set({
       'id': courseStudentDoc.id,
       'bilkentId': bilkentId,
@@ -543,7 +826,11 @@ class DBHelper {
   // --- Submissions İşlemleri ---
 
   /// submit310: Course için (courseCode "310") yeni Submission ekler.
-  static Future<void> submit310(String bilkentId, String comments, String assignmentId) async {
+  static Future<void> submit310(
+    String bilkentId,
+    String comments,
+    String assignmentId,
+  ) async {
     await _firestore.collection('Submissions').add({
       'courseId': '310', // courseCode olarak
       'bilkentId': bilkentId,
@@ -554,7 +841,11 @@ class DBHelper {
   }
 
   /// submit290: Course için (courseCode "290") yeni Submission ekler.
-  static Future<void> submit290(String bilkentId, String comments, String assignmentId) async {
+  static Future<void> submit290(
+    String bilkentId,
+    String comments,
+    String assignmentId,
+  ) async {
     await _firestore.collection('Submissions').add({
       'courseId': '290', // courseCode olarak
       'bilkentId': bilkentId,
@@ -567,36 +858,39 @@ class DBHelper {
   // --- getCurrentDetails ---
 
   /// Verilen courseCode için aktif kurs ve ilişkili Assignment'ları getirir.
-  static Future<Map<String, dynamic>> getCurrentDetails(String courseCode) async {
+  static Future<Map<String, dynamic>> getCurrentDetails(
+    String courseCode,
+  ) async {
     final courseDoc = await getActiveCourseDoc(courseCode);
     if (courseDoc == null) {
       throw Exception('No active course found for code $courseCode');
     }
-    final courseId = (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
-    final assignmentsSnapshot = await _firestore
-        .collection('Assignment')
-        .where('courseId', isEqualTo: courseId)
-        .get();
-    List<Map<String, dynamic>> assignments = assignmentsSnapshot.docs.map((doc) => {
-      'id': doc.id,
-      ...doc.data() as Map<String, dynamic>,
-    }).toList();
+    final courseId =
+        (courseDoc.data() as Map<String, dynamic>)['courseId'].toString();
+    final assignmentsSnapshot =
+        await _firestore
+            .collection('Assignment')
+            .where('courseId', isEqualTo: courseId)
+            .get();
+    List<Map<String, dynamic>> assignments =
+        assignmentsSnapshot.docs
+            .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+            .toList();
 
     return {
-      'course': {
-        'id': courseId,
-        ...courseDoc.data() as Map<String, dynamic>,
-      },
+      'course': {'id': courseId, ...courseDoc.data() as Map<String, dynamic>},
       'assignments': assignments,
     };
   }
 
   // Get course info by courseId
   static Future<Map<String, dynamic>> getCourseInfo(String courseId) async {
-    final doc = await _firestore.collection('Course')
-        .where('courseId', isEqualTo: courseId)
-        .limit(1)
-        .get();
+    final doc =
+        await _firestore
+            .collection('Course')
+            .where('courseId', isEqualTo: courseId)
+            .limit(1)
+            .get();
     if (doc.docs.isNotEmpty) {
       return doc.docs.first.data() as Map<String, dynamic>;
     }
@@ -604,42 +898,53 @@ class DBHelper {
   }
 
   // Get assignments for a given courseId
-  static Future<List<Map<String, dynamic>>> getAssignments(String courseId) async {
-    final snapshot = await _firestore
-        .collection('Assignment')
-        .where('courseId', isEqualTo: courseId)
-        .get();
-    return snapshot.docs.map((doc) => {
-      'id': doc.id,
-      ...doc.data() as Map<String, dynamic>,
-    }).toList();
+  static Future<List<Map<String, dynamic>>> getAssignments(
+    String courseId,
+  ) async {
+    final snapshot =
+        await _firestore
+            .collection('Assignment')
+            .where('courseId', isEqualTo: courseId)
+            .get();
+    return snapshot.docs
+        .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+        .toList();
   }
-  
-  
-  static Future<List<Map<String, dynamic>>> getAssignmentwithName(String name, String courseId) async {
-    final snapshot = await _firestore
-        .collection('Assignment')
-        .where('name', isEqualTo: name)
-        .where('courseId', isEqualTo: courseId)
-        .get();
-    return snapshot.docs.map((doc) => {
-      'id': doc.id,
-      ...doc.data() as Map<String, dynamic>,
-    }).toList();
+
+  static Future<List<Map<String, dynamic>>> getAssignmentwithName(
+    String name,
+    String courseId,
+  ) async {
+    final snapshot =
+        await _firestore
+            .collection('Assignment')
+            .where('name', isEqualTo: name)
+            .where('courseId', isEqualTo: courseId)
+            .get();
+    return snapshot.docs
+        .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+        .toList();
   }
 
   // Get grade for a given student and assignment
-  static Future<Map<String, dynamic>?> getGrade(String bilkentId, String assignmentId, String courseId) async {
-    final snapshot = await _firestore
-        .collection('Grade')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .where('assignmentId', isEqualTo: assignmentId)
-        .where('courseId', isEqualTo: courseId)
-        .limit(1)
-        .get();
+  static Future<Map<String, dynamic>?> getGrade(
+    String bilkentId,
+    String assignmentId,
+    String courseId,
+  ) async {
+    final snapshot =
+        await _firestore
+            .collection('Grade')
+            .where('bilkentId', isEqualTo: bilkentId)
+            .where('assignmentId', isEqualTo: assignmentId)
+            .where('courseId', isEqualTo: courseId)
+            .limit(1)
+            .get();
     if (snapshot.docs.isNotEmpty) {
       return snapshot.docs.first.data() as Map<String, dynamic>;
-      debugPrint("Grade found for student $bilkentId, assignment $assignmentId, grade: ${snapshot.docs.first.data()['grade']}");
+      debugPrint(
+        "Grade found for student $bilkentId, assignment $assignmentId, grade: ${snapshot.docs.first.data()['grade']}",
+      );
     }
     return null;
   }
