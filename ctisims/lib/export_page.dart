@@ -20,7 +20,10 @@ class AppStyles {
 class ExportPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters; // added field
 
-  const ExportPage({super.key, required this.registeredSemesters}); // updated constructor
+  const ExportPage({
+    super.key,
+    required this.registeredSemesters,
+  }); // updated constructor
 
   @override
   _ExportPageState createState() => _ExportPageState();
@@ -53,20 +56,21 @@ class _ExportPageState extends State<ExportPage> {
         _filteredCourses = List.from(courses);
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error fetching courses: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error fetching courses: $e")));
     }
   }
 
   void updateSearch(String query) {
     setState(() {
       searchQuery = query;
-      _filteredCourses = _allCourses.where((course) {
-        // Assuming we display course as "CTIS${course['code']}"
-        final courseText = "CTIS${course['code']}".toLowerCase();
-        return courseText.contains(query.toLowerCase());
-      }).toList();
+      _filteredCourses =
+          _allCourses.where((course) {
+            // Assuming we display course as "CTIS${course['code']}"
+            final courseText = "CTIS${course['code']}".toLowerCase();
+            return courseText.contains(query.toLowerCase());
+          }).toList();
     });
   }
 
@@ -79,52 +83,86 @@ class _ExportPageState extends State<ExportPage> {
   // Add helper function to export grades in Excel format using getAllGradesWithStudentInfo.
   Future<void> _exportGradesExcel(String courseId) async {
     try {
-      debugPrint("Exporting grades for course: $courseId");
+      debugPrint("Starting export grades for course: $courseId");
       final gradeData = await DBHelper.getAllGradesWithStudentInfo(courseId);
       if (!mounted) return;
+
+      debugPrint("Received grade data: $gradeData");
+
       var excel = Excel.createExcel();
       Sheet sheet = excel['Grades'];
 
       sheet.appendRow([
-        TextCellValue("Student ID"),
+        TextCellValue("Bilkent ID"),
         TextCellValue("Student Name"),
         TextCellValue("Assignment"),
         TextCellValue("Grade"),
       ]);
 
-      // Changed cast for grades map:
-      final grades = (gradeData['grades'] as Map).cast<String, dynamic>();
-      grades.forEach((studentId, info) {
-        final String name = info['name'] ?? '';
-        final gradeMap = (info['grades'] as Map?)?.cast<String, dynamic>() ?? {};
-        gradeMap.forEach((assignment, grade) {
-          sheet.appendRow([
-            TextCellValue(studentId),
-            TextCellValue(name),
-            TextCellValue(assignment),
-            TextCellValue(grade?.toString() ?? ''),
-          ]);
+      // Check if grades exist and not empty
+      if (gradeData.containsKey('grades') &&
+          gradeData['grades'] is Map &&
+          (gradeData['grades'] as Map).isNotEmpty) {
+        final grades = (gradeData['grades'] as Map).cast<String, dynamic>();
+        debugPrint("Processing ${grades.length} student records");
+
+        grades.forEach((bilkentId, info) {
+          final String name = info['name'] ?? '';
+          debugPrint("Processing student: $name ($bilkentId)");
+
+          if (info.containsKey('grades') && info['grades'] is Map) {
+            final gradeMap = (info['grades'] as Map).cast<String, dynamic>();
+            debugPrint("Student has ${gradeMap.length} grades");
+
+            gradeMap.forEach((assignment, grade) {
+              debugPrint("Adding row: $bilkentId, $name, $assignment, $grade");
+              sheet.appendRow([
+                TextCellValue(bilkentId),
+                TextCellValue(name),
+                TextCellValue(assignment),
+                TextCellValue(grade?.toString() ?? ''),
+              ]);
+            });
+          } else {
+            debugPrint("No grades found for student: $name");
+            // Add a row indicating no grades
+            sheet.appendRow([
+              TextCellValue(bilkentId),
+              TextCellValue(name),
+              TextCellValue("No assignments"),
+              TextCellValue(""),
+            ]);
+          }
         });
-      });
+      } else {
+        debugPrint("No grades data found in the response");
+        // Add a row indicating no data
+        sheet.appendRow([
+          TextCellValue(""),
+          TextCellValue(""),
+          TextCellValue("No grade data available"),
+          TextCellValue(""),
+        ]);
+      }
 
       final excelBytes = excel.encode();
       if (excelBytes == null) throw Exception("Failed to encode Excel file");
+
       if (kIsWeb) {
-        final blob = html.Blob(
-          [excelBytes],
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
+        final blob = html.Blob([
+          excelBytes,
+        ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         final url = html.Url.createObjectUrlFromBlob(blob);
-        // Remove or comment out the unused local variable anchor.
-        // final anchor = html.AnchorElement(href: url);
-        // anchor.download = "grades_$courseId.xlsx";
-        // anchor.click();
 
         html.AnchorElement(href: url)
           ..download = "grades_$courseId.xlsx"
           ..click();
 
         html.Url.revokeObjectUrl(url);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Excel file downloaded successfully")),
+        );
       } else {
         final directory = await getTemporaryDirectory();
         if (!mounted) return; // Check if (mounted) after async gap.
@@ -139,9 +177,9 @@ class _ExportPageState extends State<ExportPage> {
     } catch (e) {
       if (!mounted) return; // Check if (mounted).
       debugPrint("Error exporting grades: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error exporting grades: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error exporting grades: $e")));
     }
   }
 
@@ -155,9 +193,9 @@ class _ExportPageState extends State<ExportPage> {
       );
     } catch (e) {
       if (!mounted) return; // Check if (mounted).
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error deactivating course: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error deactivating course: $e")));
     }
   }
 
@@ -226,7 +264,9 @@ class _ExportPageState extends State<ExportPage> {
                       return Card(
                         elevation: AppStyles.cardElevation,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppStyles.borderRadius,
+                          ),
                         ),
                         child: Padding(
                           padding: AppStyles.padding,
@@ -235,20 +275,17 @@ class _ExportPageState extends State<ExportPage> {
                             children: [
                               // Header: Year (left) and Semester (right)
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     course['year'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
+                                    style: Theme.of(context).textTheme.bodyLarge
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     course['semester'] ?? '',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
+                                    style: Theme.of(context).textTheme.bodyLarge
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -276,24 +313,35 @@ class _ExportPageState extends State<ExportPage> {
                                         setState(() {
                                           _gradesLoading[index] = true;
                                         });
-                                        await _exportGradesExcel(course['courseId'] ?? '');
+                                        await _exportGradesExcel(
+                                          course['courseId'] ?? '',
+                                        );
                                         setState(() {
                                           _gradesLoading[index] = false;
                                         });
                                       },
-                                      icon: _gradesLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 24,
-                                              width: 24,
-                                              child: CircularProgressIndicator())
-                                          : const Icon(Icons.grade),
-                                      label: const Text("Export Grades (Excel)"),
+                                      icon:
+                                          _gradesLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 24,
+                                                width: 24,
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              )
+                                              : const Icon(Icons.grade),
+                                      label: const Text(
+                                        "Export Grades (Excel)",
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -302,38 +350,55 @@ class _ExportPageState extends State<ExportPage> {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      onPressed: _submissionsLoading[index] == true
-                                          ? null
-                                          : () async {
-                                              setState(() {
-                                                _submissionsLoading[index] = true;
-                                              });
-                                              await simulateExport(() {
+                                      onPressed:
+                                          _submissionsLoading[index] == true
+                                              ? null
+                                              : () async {
                                                 setState(() {
-                                                  _submissionsLoading[index] = false;
+                                                  _submissionsLoading[index] =
+                                                      true;
                                                 });
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text("Submissions exported successfully")),
-                                                );
-                                              });
-                                            },
-                                      icon: _submissionsLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.file_download),
+                                                await simulateExport(() {
+                                                  setState(() {
+                                                    _submissionsLoading[index] =
+                                                        false;
+                                                  });
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        "Submissions exported successfully",
+                                                      ),
+                                                    ),
+                                                  );
+                                                });
+                                              },
+                                      icon:
+                                          _submissionsLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 16,
+                                                width: 16,
+                                                child: CircularProgressIndicator(
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                              : const Icon(Icons.file_download),
                                       label: const Text("Export Submissions"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                          borderRadius: BorderRadius.circular(
+                                            AppStyles.borderRadius,
+                                          ),
                                         ),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -346,20 +411,27 @@ class _ExportPageState extends State<ExportPage> {
                                         setState(() {
                                           _deactivateLoading[index] = true;
                                         });
-                                        await _deactivateCourse(course['courseId'] ?? '');
+                                        await _deactivateCourse(
+                                          course['courseId'] ?? '',
+                                        );
                                         setState(() {
                                           _deactivateLoading[index] = false;
                                         });
                                       },
-                                      icon: _deactivateLoading[index] == true
-                                          ? const SizedBox(
-                                              height: 24,
-                                              width: 24,
-                                              child: CircularProgressIndicator())
-                                          : const Icon(Icons.cancel),
+                                      icon:
+                                          _deactivateLoading[index] == true
+                                              ? const SizedBox(
+                                                height: 24,
+                                                width: 24,
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              )
+                                              : const Icon(Icons.cancel),
                                       label: const Text("Deactivate Course"),
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),

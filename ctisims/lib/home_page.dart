@@ -1,12 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ctisims/dbHelper.dart';
+import 'package:ctisims/local_db_helper.dart';
 import 'package:ctisims/login_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dashboard_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:async/async.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/rendering.dart';
 import 'package:ctisims/themes/Theme_provider.dart';
 
 class HomePageModel extends ChangeNotifier {
@@ -18,6 +21,20 @@ class HomePageModel extends ChangeNotifier {
   String? selectedChangeDeadlineCourse;
   String? selectedOption;
   String? selectedSupervisor;
+
+  // New for SQLite
+  List<Map<String, dynamic>> _students = [];
+  List<Map<String, dynamic>> _courses = [];
+  List<Map<String, dynamic>> _supervisors = [];
+  Map<String, dynamic>? _selectedStudentMap;
+  Map<String, dynamic>? _selectedCourseMap;
+
+  // Getters for the new fields
+  List<Map<String, dynamic>> get students => _students;
+  List<Map<String, dynamic>> get courses => _courses;
+  List<Map<String, dynamic>> get supervisors => _supervisors;
+  Map<String, dynamic>? get selectedStudentMap => _selectedStudentMap;
+  Map<String, dynamic>? get selectedCourseMap => _selectedCourseMap;
 
   void updateYear(String? year) {
     selectedYear = year;
@@ -58,6 +75,49 @@ class HomePageModel extends ChangeNotifier {
     selectedSupervisor = supervisor;
     notifyListeners();
   }
+
+  // Methods for SQLite
+  void setStudents(List<Map<String, dynamic>> students) {
+    _students = students;
+    notifyListeners();
+  }
+
+  void setCourses(List<Map<String, dynamic>> courses) {
+    _courses = courses;
+    notifyListeners();
+  }
+
+  void setSupervisors(List<Map<String, dynamic>> supervisors) {
+    _supervisors = supervisors;
+    notifyListeners();
+  }
+
+  void updateSelectedStudent(Map<String, dynamic>? student) {
+    _selectedStudentMap = student;
+    notifyListeners();
+  }
+
+  void updateSelectedCourse(Map<String, dynamic>? course) {
+    _selectedCourseMap = course;
+    notifyListeners();
+  }
+
+  // Load data from SQLite
+  Future<void> loadDataFromLocalDB() async {
+    try {
+      final students = await LocalDBHelper.instance.getStudents();
+      final courses = await LocalDBHelper.instance.getCourses();
+      final supervisors = await LocalDBHelper.instance.getSupervisors();
+
+      _students = students;
+      _courses = courses;
+      _supervisors = supervisors;
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error loading data from local DB: $e");
+    }
+  }
 }
 
 class AppStyles {
@@ -67,6 +127,69 @@ class AppStyles {
   static const borderRadius = 16.0;
   static const padding = EdgeInsets.all(16.0);
   static const fieldSpacing = SizedBox(height: 16);
+}
+
+// Reusable gesture button widget for consistent button styling
+class GestureButton extends StatelessWidget {
+  final String text;
+  final VoidCallback onTap;
+  final Color color;
+  final double? width;
+
+  const GestureButton({
+    super.key,
+    required this.text,
+    required this.onTap,
+    this.color = AppStyles.buttonColor,
+    this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) {
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        width: width,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+            onTap: onTap,
+            splashColor: Colors.white.withOpacity(0.3),
+            highlightColor: Colors.white.withOpacity(0.1),
+            child: Ink(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+              child: Center(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class HomePage extends StatefulWidget {
@@ -96,19 +219,11 @@ class _HomePageState extends State<HomePage> {
     'Follow Up 4',
     'Follow Up 5',
     'Follow Up 6',
-    'Report'
-  ];
-  final List<Map<String, String>> _supervisors = [
-    {'id': '1', 'name': 'Neşe Şahin Özçelik'},
-    {'id': '2', 'name': 'Serkan Genç'},
-    {'id': '3', 'name': 'Erkan Uçar'},
+    'Report',
   ];
 
-  final List<Map<String, String>> _registeredSemesters = [
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS310', 'role': 'Student'},
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Student'},
-    {'year': '2022-2023', 'semester': 'Fall', 'course': 'CTIS290', 'role': 'Admin'},
-  ];
+  // Data will be loaded from local DB
+  List<Map<String, dynamic>> _registeredSemesters = [];
 
   Future<void> _selectDeadlineDate(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
@@ -143,52 +258,116 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _addUser() async {
     try {
-      DBHelper.addUser(_nameController.text, _emailController.text, _bilkentIdController.text, 
-            Provider.of<HomePageModel>(context, listen: false).selectedRole ?? '',
-            _supervisors.firstWhere((supervisor) => supervisor['name'] == Provider.of<HomePageModel>(context, listen: false).selectedSupervisor)['id'] ?? '');
-      
+      final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+      final selectedRole = homePageModel.selectedRole;
 
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text,
-        password: 'temporaryPassword123',
+      if (selectedRole == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please select a role')));
+        return;
+      }
+
+      String supervisorId;
+      if (selectedRole == 'Admin') {
+        supervisorId = "0";
+      } else {
+        final selectedSupervisorName = homePageModel.selectedSupervisor;
+        if (selectedSupervisorName == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a supervisor')),
+          );
+          return;
+        }
+
+        // Find the supervisor ID
+        final supervisors = homePageModel.supervisors;
+        final selectedSupervisor = supervisors.firstWhere(
+          (supervisor) => supervisor['name'] == selectedSupervisorName,
+          orElse: () => {'id': '', 'name': ''},
+        );
+        supervisorId = selectedSupervisor['id'] as String;
+      }
+
+      // Create user map for local DB
+      final user = {
+        'bilkentId': _bilkentIdController.text,
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'role': selectedRole,
+        'supervisorId': supervisorId,
+      };
+
+      // Add to local DB
+      await LocalDBHelper.instance.createUser(user);
+
+      // Add to Firebase
+      await DBHelper.addUser(
+        _nameController.text,
+        _emailController.text,
+        _bilkentIdController.text,
+        selectedRole,
+        supervisorId,
       );
 
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+      // Create Firebase auth account
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text,
+            password: 'temporaryPassword123',
+          );
+
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailController.text,
+      );
+
+      // Reload data from local DB
+      await homePageModel.loadDataFromLocalDB();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User added and password reset email sent')),
+        const SnackBar(
+          content: Text('User added and password reset email sent'),
+        ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add user: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to add user: $e')));
     }
   }
 
   Future<List<Map<String, dynamic>>>? _deadline310;
   Future<List<Map<String, dynamic>>>? _deadline290;
 
-  // New variables for dropdown selections
-  List<Map<String, dynamic>> _students = [];
-  List<Map<String, dynamic>> _courses = [];
-  Map<String, dynamic>? _selectedStudent;
-  Map<String, dynamic>? _selectedCourse;
-
   @override
   void initState() {
     super.initState();
     _deadline310 = DBHelper.getActiveCourseAssignments("310");
     _deadline290 = DBHelper.getActiveCourseAssignments("290");
-    _loadStudentsAndCourses();
+    _loadData();
   }
 
-  Future<void> _loadStudentsAndCourses() async {
-    final students = await DBHelper.getAllStudents();
-    final courses = await DBHelper.getAllCourses();
-    setState(() {
-      _students = students;
-      _courses = courses;
-    });
+  Future<void> _loadData() async {
+    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    await homePageModel.loadDataFromLocalDB();
+
+    // Get registered semesters
+    try {
+      final courses = await LocalDBHelper.instance.getCourses();
+      setState(() {
+        _registeredSemesters =
+            courses.map((course) {
+              return {
+                'year': course['year'] as String,
+                'semester': course['semester'] as String,
+                'course': 'CTIS${course['code']}',
+                'role': 'Admin', // Default role for courses
+              };
+            }).toList();
+      });
+    } catch (e) {
+      debugPrint("Error loading registered semesters: $e");
+    }
   }
 
   @override
@@ -201,36 +380,52 @@ class _HomePageState extends State<HomePage> {
         title: const Text('CTIS IMS'),
         backgroundColor: AppStyles.primaryColor,
         actions: [
+          // Dashboard Button
           TextButton(
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => DashboardPage(
-                    registeredSemesters: _registeredSemesters,
-                    userData: widget.userData, // pass the userData
+                    registeredSemesters: _registeredSemesters
+                        .map(
+                          (item) => Map<String, String>.fromEntries(
+                            item.entries.map(
+                              (e) => MapEntry(e.key, e.value.toString()),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    userData: widget.userData,
                   ),
                 ),
               );
             },
-            child: const Text('Dashboard', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: const Text(
+              'Dashboard',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
+          // Username Display
           TextButton(
             onPressed: () {},
-            child: Text('${widget.userData.username}', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: Text(
+              '${widget.userData.username}',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
-          //darkmode
+          // Dark Mode Toggle
           IconButton(
             icon: Icon(
-            isDark ? Icons.dark_mode : Icons.light_mode,
-            color: Colors.grey, // Consistent grey color everywhere
-              ),
-              tooltip: 'Toggle Dark Mode',
-              onPressed: () {
-            themeProvider.toggleTheme();
-              },
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
           ),
-          //Logout button
+          // Logout Button
           TextButton(
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -241,7 +436,10 @@ class _HomePageState extends State<HomePage> {
                 ),
               );
             },
-            child: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -267,9 +465,9 @@ class _HomePageState extends State<HomePage> {
                 child: Text(
                   'Initialize Semester & Add Users',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 28,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                  ),
                 ),
               ),
             ),
@@ -347,10 +545,9 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 8),
                   Text(
                     headerTitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -366,16 +563,9 @@ class _HomePageState extends State<HomePage> {
               child: Semantics(
                 button: true,
                 label: buttonText,
-                child: ElevatedButton(
-                  onPressed: () => _openModal(modalContent),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppStyles.buttonColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                  ),
-                  child: Text(buttonText),
+                child: GestureButton(
+                  text: buttonText,
+                  onTap: () => _openModal(modalContent),
                 ),
               ),
             ),
@@ -386,28 +576,41 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openModal(Widget modalContent) async {
+    // Prevent multiple modal opens
+    if (!mounted) return;
+
     final homePageModel = Provider.of<HomePageModel>(context, listen: false);
     await showGeneralDialog(
       context: context,
-      barrierLabel: "Modal",
       barrierDismissible: true,
+      barrierLabel: "Modal",
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
-        return Align(
-          alignment: Alignment.center,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: AppStyles.padding,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-              ),
-              child: ChangeNotifierProvider.value(
-                value: homePageModel,
-                child: SingleChildScrollView(child: modalContent),
+        return WillPopScope(
+          onWillPop: () async {
+            // Reset any selections when modal is closed
+            homePageModel.updateSelectedStudent(null);
+            homePageModel.updateSelectedCourse(null);
+            homePageModel.updateRole(null);
+            homePageModel.updateSupervisor(null);
+            return true;
+          },
+          child: Align(
+            alignment: Alignment.center,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: AppStyles.padding,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                ),
+                child: ChangeNotifierProvider.value(
+                  value: homePageModel,
+                  child: SingleChildScrollView(child: modalContent),
+                ),
               ),
             ),
           ),
@@ -419,13 +622,24 @@ class _HomePageState extends State<HomePage> {
           child: ScaleTransition(scale: anim1, child: child),
         );
       },
-    );
+    ).then((_) {
+      // Reset selections after modal is closed
+      if (mounted) {
+        homePageModel.updateSelectedStudent(null);
+        homePageModel.updateSelectedCourse(null);
+        homePageModel.updateRole(null);
+        homePageModel.updateSupervisor(null);
+      }
+    });
   }
 
   Widget _currentDeadlineModalContent() {
     final dateFormat = DateFormat('MM/dd/yyyy HH:mm');
     return StreamBuilder<List<List<Map<String, dynamic>>>>(
-      stream: StreamZip([DBHelper.streamCurrentDeadline310(), DBHelper.streamCurrentDeadline290()]),
+      stream: StreamZip([
+        DBHelper.streamCurrentDeadline310(),
+        DBHelper.streamCurrentDeadline290(),
+      ]),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -437,21 +651,29 @@ class _HomePageState extends State<HomePage> {
           final matchA = RegExp(r'Follow Up (\d+)').firstMatch(nameA);
           final matchB = RegExp(r'Follow Up (\d+)').firstMatch(nameB);
           if (matchA != null && matchB != null) {
-            return int.parse(matchA.group(1)!).compareTo(int.parse(matchB.group(1)!));
+            return int.parse(
+              matchA.group(1)!,
+            ).compareTo(int.parse(matchB.group(1)!));
           }
           return nameA.compareTo(nameB);
         });
         // For CTIS290, filter only "report" (case insensitive)
-        final data290 = (snapshot.data![1] as List<Map<String, dynamic>>)
-            .where((item) => (item['name'] ?? '').toString().toLowerCase() == 'report')
-            .toList();
+        final data290 =
+            (snapshot.data![1] as List<Map<String, dynamic>>)
+                .where(
+                  (item) =>
+                      (item['name'] ?? '').toString().toLowerCase() == 'report',
+                )
+                .toList();
         return Form(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Current Deadline Settings',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               AppStyles.fieldSpacing,
               Text('CTIS 310'),
@@ -461,7 +683,9 @@ class _HomePageState extends State<HomePage> {
                     final deadlineVal = item['deadline'];
                     String deadlineStr;
                     if (deadlineVal is Timestamp) {
-                      deadlineStr = dateFormat.format(deadlineVal.toDate().toLocal());
+                      deadlineStr = dateFormat.format(
+                        deadlineVal.toDate().toLocal(),
+                      );
                     } else {
                       deadlineStr = deadlineVal.toString();
                     }
@@ -476,7 +700,9 @@ class _HomePageState extends State<HomePage> {
                     final deadlineVal = item['deadline'];
                     String deadlineStr;
                     if (deadlineVal is Timestamp) {
-                      deadlineStr = dateFormat.format(deadlineVal.toDate().toLocal());
+                      deadlineStr = dateFormat.format(
+                        deadlineVal.toDate().toLocal(),
+                      );
                     } else {
                       deadlineStr = deadlineVal.toString();
                     }
@@ -486,16 +712,9 @@ class _HomePageState extends State<HomePage> {
               AppStyles.fieldSpacing,
               Align(
                 alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppStyles.buttonColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                  ),
-                  child: const Text('Close'),
+                child: GestureButton(
+                  text: 'Close',
+                  onTap: () => Navigator.pop(context),
                 ),
               ),
             ],
@@ -516,7 +735,9 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 'Change Deadline Settings',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               AppStyles.fieldSpacing,
               DropdownButtonFormField<String>(
@@ -526,9 +747,15 @@ class _HomePageState extends State<HomePage> {
                   labelText: 'Course',
                   border: OutlineInputBorder(),
                 ),
-                items: _changeDeadlineCourses
-                    .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-                    .toList(),
+                items:
+                    _changeDeadlineCourses
+                        .map(
+                          (course) => DropdownMenuItem(
+                            value: course,
+                            child: Text(course),
+                          ),
+                        )
+                        .toList(),
                 onChanged: (value) {
                   model.updateChangeDeadlineCourse(value);
                   model.updateOption(null);
@@ -544,15 +771,19 @@ class _HomePageState extends State<HomePage> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     AppStyles.fieldSpacing,
-                    ...((model.selectedChangeDeadlineCourse == 'CTIS 290') ? _ctis290Options : _ctis310Options)
-                        .map((option) => RadioListTile<String>(
-                              title: Text(option),
-                              value: option,
-                              groupValue: model.selectedOption,
-                              onChanged: (value) {
-                                model.updateOption(value);
-                              },
-                            )),
+                    ...((model.selectedChangeDeadlineCourse == 'CTIS 290')
+                            ? _ctis290Options
+                            : _ctis310Options)
+                        .map(
+                          (option) => RadioListTile<String>(
+                            title: Text(option),
+                            value: option,
+                            groupValue: model.selectedOption,
+                            onChanged: (value) {
+                              model.updateOption(value);
+                            },
+                          ),
+                        ),
                   ],
                 ),
               AppStyles.fieldSpacing,
@@ -568,34 +799,43 @@ class _HomePageState extends State<HomePage> {
                 onTap: () => _selectDeadlineDate(context),
               ),
               AppStyles.fieldSpacing,
-              ElevatedButton(
-                onPressed: () async {
-                  if (model.selectedOption == null || _deadlineController.text.isEmpty) {
+              GestureButton(
+                text: 'Update',
+                onTap: () async {
+                  if (model.selectedOption == null ||
+                      _deadlineController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select an option and set a deadline')));
+                      const SnackBar(
+                        content: Text(
+                          'Please select an option and set a deadline',
+                        ),
+                      ),
+                    );
                     return;
                   }
-                  final parsedDeadline = DateTime.tryParse(_deadlineController.text);
+                  final parsedDeadline = DateTime.tryParse(
+                    _deadlineController.text,
+                  );
                   if (parsedDeadline == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invalid deadline format')));
+                      const SnackBar(content: Text('Invalid deadline format')),
+                    );
                     return;
                   }
-                  String courseId = (model.selectedChangeDeadlineCourse == 'CTIS 290') ? '290' : '310';
+                  String courseId =
+                      (model.selectedChangeDeadlineCourse == 'CTIS 290')
+                          ? '290'
+                          : '310';
                   String assignmentName = model.selectedOption ?? '';
-                  await DBHelper.changeDeadlineSettings(courseId, assignmentName, parsedDeadline);
+                  await DBHelper.changeDeadlineSettings(
+                    courseId,
+                    assignmentName,
+                    parsedDeadline,
+                  );
                   debugPrint('New deadline: ${_deadlineController.text}');
                   debugPrint('Selected option: ${model.selectedOption}');
                   Navigator.pop(context);
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppStyles.buttonColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                ),
-                child: const Text('Update'),
               ),
             ],
           ),
@@ -605,15 +845,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _createCourseModalContent() {
-    // New dropdown for year with the specified options.
-    final List<String> _courseYears = ["2020-2021", "2022-2023", "2023-2024", "2024-2025"];
+    // Course year options
+    final List<String> _courseYears = [
+      "2020-2021",
+      "2022-2023",
+      "2023-2024",
+      "2024-2025",
+    ];
     final List<String> _courseSemesters = ["Fall", "Spring"];
-    // New dropdown for course type remains; reuse _courses: but ensure they are 
-    // "CTIS310" and "CTIS290" exactly.
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-    String? selectedYear = Provider.of<HomePageModel>(context, listen: false).selectedYear;
-    String? selectedSemester = Provider.of<HomePageModel>(context, listen: false).selectedSemester;
-    String? selectedCourse = Provider.of<HomePageModel>(context, listen: false).selectedCourse;
+    final homePageModel = Provider.of<HomePageModel>(context);
     bool isActive = true; // Initialize the isActive state
 
     return StatefulBuilder(
@@ -625,55 +866,75 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 'Create Course',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               AppStyles.fieldSpacing,
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: selectedYear,
+                value: homePageModel.selectedYear,
                 decoration: const InputDecoration(
                   labelText: 'Year',
                   border: OutlineInputBorder(),
                 ),
-                items: _courseYears
-                    .map((year) => DropdownMenuItem(value: year, child: Text(year)))
-                    .toList(),
+                items:
+                    _courseYears
+                        .map(
+                          (year) =>
+                              DropdownMenuItem(value: year, child: Text(year)),
+                        )
+                        .toList(),
                 onChanged: (value) {
-                  Provider.of<HomePageModel>(context, listen: false).updateYear(value);
+                  homePageModel.updateYear(value);
                 },
-                validator: (value) => value == null ? 'Please select a year' : null,
+                validator:
+                    (value) => value == null ? 'Please select a year' : null,
               ),
               AppStyles.fieldSpacing,
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: selectedSemester,
+                value: homePageModel.selectedSemester,
                 decoration: const InputDecoration(
                   labelText: 'Semester',
                   border: OutlineInputBorder(),
                 ),
-                items: _courseSemesters
-                    .map((sem) => DropdownMenuItem(value: sem, child: Text(sem)))
-                    .toList(),
+                items:
+                    _courseSemesters
+                        .map(
+                          (sem) =>
+                              DropdownMenuItem(value: sem, child: Text(sem)),
+                        )
+                        .toList(),
                 onChanged: (value) {
-                  Provider.of<HomePageModel>(context, listen: false).updateSemester(value);
+                  homePageModel.updateSemester(value);
                 },
-                validator: (value) => value == null ? 'Please select a semester' : null,
+                validator:
+                    (value) =>
+                        value == null ? 'Please select a semester' : null,
               ),
               AppStyles.fieldSpacing,
               DropdownButtonFormField<String>(
                 isExpanded: true,
-                value: selectedCourse,
+                value: homePageModel.selectedCourse,
                 decoration: const InputDecoration(
                   labelText: 'Course',
                   border: OutlineInputBorder(),
                 ),
-                items: _courseList
-                    .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-                    .toList(),
+                items:
+                    _courseList
+                        .map(
+                          (course) => DropdownMenuItem(
+                            value: course,
+                            child: Text(course),
+                          ),
+                        )
+                        .toList(),
                 onChanged: (value) {
-                  Provider.of<HomePageModel>(context, listen: false).updateCourse(value);
+                  homePageModel.updateCourse(value);
                 },
-                validator: (value) => value == null ? 'Please select a course' : null,
+                validator:
+                    (value) => value == null ? 'Please select a course' : null,
               ),
               AppStyles.fieldSpacing,
               // Checkbox for isActive (we assume new courses are active by default).
@@ -691,36 +952,58 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               AppStyles.fieldSpacing,
-              ElevatedButton(
-                onPressed: () async {
+              GestureButton(
+                text: 'Create Course',
+                onTap: () async {
                   if (!formKey.currentState!.validate()) return;
                   try {
+                    final selectedYear = homePageModel.selectedYear!;
+                    final selectedSemester = homePageModel.selectedSemester!;
+                    final selectedCourse = homePageModel.selectedCourse!;
+
+                    // Generate a unique ID for the course
+                    final courseId =
+                        DateTime.now().millisecondsSinceEpoch.toString();
+                    final numericCode =
+                        selectedCourse.startsWith("CTIS")
+                            ? selectedCourse.substring(4)
+                            : selectedCourse;
+
+                    // Create course in local DB
+                    await LocalDBHelper.instance.createCourse({
+                      'id': courseId,
+                      'code': numericCode,
+                      'year': selectedYear,
+                      'semester': selectedSemester,
+                      'isActive': isActive ? 1 : 0,
+                    });
+
+                    // Create course in Firebase
                     await DBHelper.createCourse(
-                      Provider.of<HomePageModel>(context, listen: false).selectedCourse!,
-                      Provider.of<HomePageModel>(context, listen: false).selectedYear!,
-                      Provider.of<HomePageModel>(context, listen: false).selectedSemester!,
-                      isActive
+                      selectedCourse,
+                      selectedYear,
+                      selectedSemester,
+                      isActive,
                     );
+
+                    // Reload data from local DB
+                    await homePageModel.loadDataFromLocalDB();
+                    await _loadData(); // Reload registered semesters
+
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Course created successfully'))
+                      const SnackBar(
+                        content: Text('Course created successfully'),
+                      ),
                     );
                     Navigator.pop(context);
                   } catch (e) {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: ${e.toString()}'))
+                      SnackBar(content: Text('Error: ${e.toString()}')),
                     );
                   }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppStyles.buttonColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                ),
-                child: const Text('Create Course'),
               ),
             ],
           ),
@@ -731,181 +1014,242 @@ class _HomePageState extends State<HomePage> {
 
   Widget _addUserModalContent() {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-    return Form(
-      key: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Add User',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          AppStyles.fieldSpacing,
-          TextFormField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter a name';
-              return null;
-            },
-          ),
-          AppStyles.fieldSpacing,
-          TextFormField(
-            controller: _emailController,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter an email';
-              return null;
-            },
-          ),
-          AppStyles.fieldSpacing,
-          TextFormField(
-            controller: _bilkentIdController,
-            decoration: const InputDecoration(
-              labelText: 'Bilkent ID',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) return 'Please enter a Bilkent ID';
-              return null;
-            },
-          ),
-          AppStyles.fieldSpacing,
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedRole,
-            decoration: const InputDecoration(
-              labelText: 'Role',
-              border: OutlineInputBorder(),
-            ),
-            items: _roles
-                .map((role) => DropdownMenuItem(value: role, child: Text(role)))
-                .toList(),
-            onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateRole(value);
-            },
-          ),
-          AppStyles.fieldSpacing,
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            value: Provider.of<HomePageModel>(context, listen: false).selectedSupervisor,
-            decoration: const InputDecoration(
-              labelText: 'Supervisor',
-              border: OutlineInputBorder(),
-            ),
-            items: _supervisors
-                .map((supervisor) => DropdownMenuItem(value: supervisor['name'], child: Text(supervisor['name']!)))
-                .toList(),
-            onChanged: (value) {
-              Provider.of<HomePageModel>(context, listen: false).updateSupervisor(value);
-            },
-          ),
-          AppStyles.fieldSpacing,
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                _addUser();
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppStyles.buttonColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+
+    return StatefulBuilder(
+      builder: (BuildContext context, StateSetter setState) {
+        return Form(
+          key: formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add User',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            ),
-            child: const Text('Add User'),
+              AppStyles.fieldSpacing,
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty)
+                    return 'Please enter a name';
+                  return null;
+                },
+              ),
+              AppStyles.fieldSpacing,
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty)
+                    return 'Please enter an email';
+                  return null;
+                },
+              ),
+              AppStyles.fieldSpacing,
+              TextFormField(
+                controller: _bilkentIdController,
+                decoration: const InputDecoration(
+                  labelText: 'Bilkent ID',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty)
+                    return 'Please enter a Bilkent ID';
+                  return null;
+                },
+              ),
+              AppStyles.fieldSpacing,
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: homePageModel.selectedRole,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  border: OutlineInputBorder(),
+                ),
+                items:
+                    _roles
+                        .map(
+                          (role) =>
+                              DropdownMenuItem(value: role, child: Text(role)),
+                        )
+                        .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    homePageModel.updateRole(value);
+                  });
+                },
+              ),
+              AppStyles.fieldSpacing,
+              // Only show supervisor dropdown when role is Student
+              if (homePageModel.selectedRole == 'Student')
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: homePageModel.selectedSupervisor,
+                  decoration: const InputDecoration(
+                    labelText: 'Supervisor',
+                    border: OutlineInputBorder(),
+                  ),
+                  items:
+                      homePageModel.supervisors
+                          .map(
+                            (supervisor) => DropdownMenuItem(
+                              value: supervisor['name'] as String,
+                              child: Text(supervisor['name'] as String),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    homePageModel.updateSupervisor(value);
+                  },
+                ),
+              if (homePageModel.selectedRole == 'Student')
+                AppStyles.fieldSpacing,
+              GestureButton(
+                text: 'Add User',
+                onTap: () {
+                  if (formKey.currentState!.validate()) {
+                    _addUser();
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _addStudentCourseModalContent() {
+    final homePageModel = Provider.of<HomePageModel>(context);
+
     return Form(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Add Student Course',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           AppStyles.fieldSpacing,
-          // Student dropdown using DropdownButtonFormField without a custom selectedItemBuilder.
-          DropdownButtonFormField<Map<String, dynamic>>(
+          // Student dropdown
+          DropdownButtonFormField<String>(
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: "Select Student",
               border: OutlineInputBorder(),
             ),
-            value: _selectedStudent,
-            items: _students.map((student) {
-              return DropdownMenuItem<Map<String, dynamic>>(
-                value: student,
-                child: Text("${student['name']} (${student['bilkentId']})"),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedStudent = value;
-              });
+            value:
+                homePageModel.selectedStudentMap != null
+                    ? homePageModel.selectedStudentMap!['bilkentId'] as String
+                    : null,
+            items:
+                homePageModel.students.map((student) {
+                  final bilkentId = student['bilkentId'] as String;
+                  return DropdownMenuItem<String>(
+                    value: bilkentId,
+                    child: Text("${student['name']} (${student['bilkentId']})"),
+                  );
+                }).toList(),
+            onChanged: (bilkentId) {
+              if (bilkentId != null) {
+                final selectedStudent = homePageModel.students.firstWhere(
+                  (student) => student['bilkentId'] == bilkentId,
+                  orElse: () => {},
+                );
+                homePageModel.updateSelectedStudent(selectedStudent);
+              }
             },
           ),
           AppStyles.fieldSpacing,
-          // Course dropdown using similar approach.
-          DropdownButtonFormField<Map<String, dynamic>>(
+          // Course dropdown
+          DropdownButtonFormField<String>(
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: "Select Course",
               border: OutlineInputBorder(),
             ),
-            value: _selectedCourse,
-            items: _courses.map((course) {
-              return DropdownMenuItem<Map<String, dynamic>>(
-                value: course,
-                child: Text("CTIS${course['code']} - ${course['year']} ${course['semester']}"),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedCourse = value;
-              });
+            value:
+                homePageModel.selectedCourseMap != null
+                    ? homePageModel.selectedCourseMap!['id'] as String
+                    : null,
+            items:
+                homePageModel.courses.map((course) {
+                  final courseId = course['id'] as String;
+                  return DropdownMenuItem<String>(
+                    value: courseId,
+                    child: Text(
+                      "CTIS${course['code']} - ${course['year']} ${course['semester']}",
+                    ),
+                  );
+                }).toList(),
+            onChanged: (courseId) {
+              if (courseId != null) {
+                final selectedCourse = homePageModel.courses.firstWhere(
+                  (course) => course['id'] == courseId,
+                  orElse: () => {},
+                );
+                homePageModel.updateSelectedCourse(selectedCourse);
+              }
             },
           ),
           AppStyles.fieldSpacing,
-          ElevatedButton(
-            onPressed: () async {
-              if (_selectedStudent != null && _selectedCourse != null) {
-                final bilkentId = _selectedStudent!['bilkentId']?.toString() ?? '';
-                final name = _selectedStudent!['name'] ?? 'Unknown';
-                final courseId = _selectedCourse!['courseId']?.toString() ?? '';
+          GestureButton(
+            text: 'Add',
+            onTap: () async {
+              final selectedStudent = homePageModel.selectedStudentMap;
+              final selectedCourse = homePageModel.selectedCourseMap;
+
+              if (selectedStudent != null && selectedCourse != null) {
+                final bilkentId =
+                    selectedStudent['bilkentId']?.toString() ?? '';
+                final name = selectedStudent['name'] ?? 'Unknown';
+                final courseId = selectedCourse['id']?.toString() ?? '';
+
                 try {
+                  // Add to local SQLite
+                  await LocalDBHelper.instance.addStudentToCourse({
+                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                    'bilkentId': bilkentId,
+                    'courseId': courseId,
+                    'name': name,
+                    'companyEvaluationUploaded': 0,
+                    'isActive': selectedCourse['isActive'] == 1 ? 1 : 0,
+                  });
+
+                  // Add to Firebase
                   await DBHelper.addStudentToCourse(bilkentId, courseId, name);
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Student added to course")),
                   );
+
+                  Navigator.pop(context);
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error: $e")),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text("Error: $e")));
                 }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Please select both a student and a course"),
+                  ),
+                );
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppStyles.buttonColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            ),
-            child: const Text('Add'),
           ),
         ],
       ),
