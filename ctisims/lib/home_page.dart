@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:async/async.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/rendering.dart';
+import 'package:ctisims/themes/Theme_provider.dart';
 
 class HomePageModel extends ChangeNotifier {
   String? selectedYear;
@@ -371,87 +372,73 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS'),
         backgroundColor: AppStyles.primaryColor,
         actions: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => DashboardPage(
-                          registeredSemesters:
-                              _registeredSemesters
-                                  .map(
-                                    (item) => Map<String, String>.fromEntries(
-                                      item.entries.map(
-                                        (e) =>
-                                            MapEntry(e.key, e.value.toString()),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                          userData: widget.userData, // pass the userData
-                        ),
-                  ),
-                );
-              },
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    'Dashboard',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+          // Dashboard Button
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DashboardPage(
+                    registeredSemesters: _registeredSemesters
+                        .map(
+                          (item) => Map<String, String>.fromEntries(
+                            item.entries.map(
+                              (e) => MapEntry(e.key, e.value.toString()),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    userData: widget.userData,
                   ),
                 ),
-              ),
+              );
+            },
+            child: const Text(
+              'Dashboard',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {},
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    '${widget.userData.username}',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ),
-              ),
+          // Username Display
+          TextButton(
+            onPressed: () {},
+            child: Text(
+              '${widget.userData.username}',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    'Logout',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
+          // Dark Mode Toggle
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+          // Logout Button
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginPage(),
                 ),
-              ),
+              );
+            },
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
         ],
