@@ -6,6 +6,8 @@ import 'login_page.dart';
 import 'home_page.dart';
 import 'package:provider/provider.dart';
 import 'themes/Theme_provider.dart';
+import 'themes/app_themes.dart';
+import 'splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,9 +43,9 @@ class MyApp extends StatelessWidget {
       title: 'CTIS IMS',
       debugShowCheckedModeBanner: false,
       themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      home: const LoginPage(),
+      theme: AppThemes.lightTheme,
+      darkTheme: AppThemes.darkTheme,
+      home: const SplashScreen(),
     );
   }
 }

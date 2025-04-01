@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'themes/Theme_provider.dart';
 
 // Centralized styling constants (reuse or import from your common styles file)
 class AppStyles {
@@ -27,7 +29,6 @@ class ExportPage extends StatefulWidget {
 }
 
 class _ExportPageState extends State<ExportPage> {
-  bool darkMode = false;
   String searchQuery = "";
 
   // Replace semesters with courses loaded from DBHelper.getAllCourses()
@@ -163,28 +164,26 @@ class _ExportPageState extends State<ExportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = darkMode ? Colors.black : Colors.grey[100];
-    final textColor = darkMode ? Colors.white : Colors.black;
-    // Replace .withOpacity(0.6) with .withAlpha(153).
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
+    final textColor = isDark ? Colors.white : Colors.black;
     final hintColor = textColor.withAlpha(153);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Export Grades & Files'),
-        backgroundColor: AppStyles.primaryColor,
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(darkMode ? Icons.dark_mode : Icons.light_mode),
+            icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
+            tooltip: 'Toggle Dark Mode',
             onPressed: () {
-              setState(() {
-                darkMode = !darkMode;
-              });
+              themeProvider.toggleTheme();
             },
           ),
         ],
       ),
-      backgroundColor: bgColor,
       body: Padding(
         padding: AppStyles.padding,
         child: Column(

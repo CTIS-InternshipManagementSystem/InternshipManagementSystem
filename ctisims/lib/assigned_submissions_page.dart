@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'evaluate_page.dart';
 import 'dbHelper.dart'; // Ensure DBHelper is imported
+import 'package:provider/provider.dart';
+import 'themes/Theme_provider.dart';
 
 class AssignedSubmissionsPage extends StatefulWidget {
   final String courseId; // new parameter
@@ -23,10 +25,27 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
+    final cardBgColor = isDark ? Colors.grey[850] : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Assigned Submissions'),
-        backgroundColor: Colors.orange,
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -38,7 +57,7 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
             }
             // If no submissions, show "No submission"
             if (snapshot.data!.isEmpty) {
-              return const Center(child: Text("No submission"));
+              return Center(child: Text("No submission", style: TextStyle(color: textColor)));
             }
             List<Map<String, dynamic>> submissions = snapshot.data!;
             // Assume each submission has a field 'companyEvaluation'
@@ -57,8 +76,11 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text('Show only without company evaluation'),
+                    Expanded(
+                      child: Text(
+                        'Show only without company evaluation',
+                        style: TextStyle(color: textColor),
+                      ),
                     ),
                     Switch(
                       value: _showWithoutEvaluation,
@@ -77,10 +99,20 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
                       final submission = filteredSubmissions[index];
                       return Card(
                         elevation: 2,
+                        color: cardBgColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         margin: const EdgeInsets.symmetric(vertical: 8.0),
                         child: ListTile(
-                          title: Text(submission['name'] ?? "Student"),
-                          subtitle: Text('Company Evaluation: ${submission['companyEvaluation']}'),
+                          title: Text(
+                            submission['name'] ?? "Student",
+                            style: TextStyle(color: textColor),
+                          ),
+                          subtitle: Text(
+                            'Company Evaluation: ${submission['companyEvaluation']}',
+                            style: TextStyle(color: textColor.withOpacity(0.8)),
+                          ),
                           trailing: ElevatedButton(
                             onPressed: () {
                               final submissionMap = {
@@ -88,7 +120,7 @@ class _AssignedSubmissionsPageState extends State<AssignedSubmissionsPage> {
                                 'courseId': widget.courseId,
                                 'studentName': submission['name'] ?? '',
                                 'email': submission['email'] ?? '',
-                                'course': 'CTIS' + (submission['courseCode'] ?? '310'),
+                                'course': 'CTIS${submission['courseCode'] ?? '310'}',
                                 'companyEvaluation': submission['companyEvaluation'] ?? 'Not Uploaded'
                               };
                               Navigator.push(

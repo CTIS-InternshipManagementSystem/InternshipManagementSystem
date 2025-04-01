@@ -3,6 +3,7 @@ import 'package:ctisims/dbHelper.dart';
 import 'package:ctisims/login_page.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
+import 'animation_demo.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:async/async.dart';
@@ -67,6 +68,17 @@ class AppStyles {
   static const borderRadius = 16.0;
   static const padding = EdgeInsets.all(16.0);
   static const fieldSpacing = SizedBox(height: 16);
+  
+  // Helper method to get color based on theme
+  static Color getButtonColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+        ? Colors.lightBlue 
+        : Colors.blue;
+  }
+  
+  static Color getPrimaryColor(BuildContext context) {
+    return Colors.orange;
+  }
 }
 
 class HomePage extends StatefulWidget {
@@ -253,7 +265,7 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: AppStyles.padding,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? Colors.grey[850] : Colors.white,
                 borderRadius: BorderRadius.circular(AppStyles.borderRadius),
                 boxShadow: [
                   BoxShadow(
@@ -387,6 +399,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openModal(Widget modalContent) async {
     final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    
     await showGeneralDialog(
       context: context,
       barrierLabel: "Modal",
@@ -402,7 +417,7 @@ class _HomePageState extends State<HomePage> {
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: AppStyles.padding,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? Colors.grey[850] : Colors.white,
                 borderRadius: BorderRadius.circular(AppStyles.borderRadius),
               ),
               child: ChangeNotifierProvider.value(

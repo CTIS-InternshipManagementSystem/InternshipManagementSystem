@@ -132,6 +132,11 @@ class _DashboardPageState extends State<DashboardPage> {
       if (s['course'] != null) courses.add(s['course']!);
     }
 
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final dialogBgColor = isDark ? Colors.grey[850] : Colors.white;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -140,42 +145,75 @@ class _DashboardPageState extends State<DashboardPage> {
         String tempSemester = semesterFilter;
         String tempCourse = courseFilter;
         return AlertDialog(
-          title: const Text("Filter Options"),
+          backgroundColor: dialogBgColor,
+          title: Text("Filter Options", style: TextStyle(color: textColor)),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
+                  dropdownColor: dialogBgColor,
+                  style: TextStyle(color: textColor),
                   value: tempRole,
-                  decoration: const InputDecoration(labelText: "Role"),
+                  decoration: InputDecoration(
+                    labelText: "Role",
+                    labelStyle: TextStyle(color: textColor),
+                  ),
                   items: ["All", "Student", "Admin"].map((value) {
-                    return DropdownMenuItem(value: value, child: Text(value));
+                    return DropdownMenuItem(
+                      value: value, 
+                      child: Text(value, style: TextStyle(color: textColor)),
+                    );
                   }).toList(),
                   onChanged: (val) => tempRole = val!,
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  dropdownColor: dialogBgColor,
+                  style: TextStyle(color: textColor),
                   value: tempYear,
-                  decoration: const InputDecoration(labelText: "Year"),
+                  decoration: InputDecoration(
+                    labelText: "Year",
+                    labelStyle: TextStyle(color: textColor),
+                  ),
                   items: years.map((value) {
-                    return DropdownMenuItem(value: value, child: Text(value));
+                    return DropdownMenuItem(
+                      value: value, 
+                      child: Text(value, style: TextStyle(color: textColor)),
+                    );
                   }).toList(),
                   onChanged: (val) => tempYear = val!,
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  dropdownColor: dialogBgColor,
+                  style: TextStyle(color: textColor),
                   value: tempSemester,
-                  decoration: const InputDecoration(labelText: "Semester"),
+                  decoration: InputDecoration(
+                    labelText: "Semester",
+                    labelStyle: TextStyle(color: textColor),
+                  ),
                   items: ["All", "Fall", "Spring"].map((value) {
-                    return DropdownMenuItem(value: value, child: Text(value));
+                    return DropdownMenuItem(
+                      value: value, 
+                      child: Text(value, style: TextStyle(color: textColor)),
+                    );
                   }).toList(),
                   onChanged: (val) => tempSemester = val!,
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  dropdownColor: dialogBgColor,
+                  style: TextStyle(color: textColor),
                   value: tempCourse,
-                  decoration: const InputDecoration(labelText: "Course"),
+                  decoration: InputDecoration(
+                    labelText: "Course",
+                    labelStyle: TextStyle(color: textColor),
+                  ),
                   items: courses.map((value) {
-                    return DropdownMenuItem(value: value, child: Text(value));
+                    return DropdownMenuItem(
+                      value: value, 
+                      child: Text(value, style: TextStyle(color: textColor)),
+                    );
                   }).toList(),
                   onChanged: (val) => tempCourse = val!,
                 ),
@@ -183,7 +221,10 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            TextButton(
+              onPressed: () => Navigator.pop(context), 
+              child: Text("Cancel", style: TextStyle(color: isDark ? Colors.lightBlue : Colors.blue)),
+            ),
             TextButton(
               onPressed: () {
                 setState(() {
@@ -195,7 +236,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _applyFilters();
                 Navigator.pop(context);
               },
-              child: const Text("Reset"),
+              child: Text("Reset", style: TextStyle(color: isDark ? Colors.lightBlue : Colors.blue)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -208,6 +249,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 _applyFilters();
                 Navigator.pop(context);
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+              ),
               child: const Text("Apply"),
             ),
           ],
@@ -221,19 +265,14 @@ class _DashboardPageState extends State<DashboardPage> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
 
-
     final textColor = isDark ? Colors.white : Colors.black;
-    final bgColor = isDark ? Colors.black : Colors.grey[100]!;
+    final bgColor = isDark ? Colors.grey[900] : Colors.grey[100]!;
     final cardBgColor = isDark ? Colors.grey[850]! : Colors.white;
-    final headerCardColor = isDark ? Colors.grey[800]! : Colors.white;
-
-
+    
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
         title: const Text('Dashboard'),
-        backgroundColor: Colors.orange,
-        centerTitle: true,
         actions: [
           IconButton(
             icon: Icon(
@@ -273,7 +312,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildSearchHeader(textColor, cardBgColor, headerCardColor),
+            _buildSearchHeader(textColor, cardBgColor),
             const SizedBox(height: 16),
             _buildCourseGrid(cardBgColor, textColor),
           ],
@@ -282,10 +321,10 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildSearchHeader(Color textColor, Color cardBgColor, Color headerCardColor) {
+  Widget _buildSearchHeader(Color textColor, Color cardBgColor) {
     return Card(
       elevation: 4,
-      color: headerCardColor,
+      color: cardBgColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
