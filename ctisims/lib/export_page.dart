@@ -40,7 +40,6 @@ class _ExportPageState extends State<ExportPage> {
 
   // Per-card loading states using maps keyed by card index.
   final Map<int, bool> _gradesLoading = {};
-  final Map<int, bool> _submissionsLoading = {};
   final Map<int, bool> _deactivateLoading = {};
 
   @override
@@ -73,12 +72,6 @@ class _ExportPageState extends State<ExportPage> {
             return courseText.contains(query.toLowerCase());
           }).toList();
     });
-  }
-
-  // Simulate an export operation per card.
-  Future<void> simulateExport(Function onCompleted) async {
-    await Future.delayed(const Duration(seconds: 2));
-    onCompleted();
   }
 
   // Add helper function to export grades in Excel format using getAllGradesWithStudentInfo.
@@ -331,63 +324,6 @@ class _ExportPageState extends State<ExportPage> {
                                       label: const Text(
                                         "Export Grades (Excel)",
                                       ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppStyles.buttonColor,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            AppStyles.borderRadius,
-                                          ),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  AppStyles.fieldSpacing,
-                                  // Export Submissions Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      onPressed:
-                                          _submissionsLoading[index] == true
-                                              ? null
-                                              : () async {
-                                                setState(() {
-                                                  _submissionsLoading[index] =
-                                                      true;
-                                                });
-                                                await simulateExport(() {
-                                                  setState(() {
-                                                    _submissionsLoading[index] =
-                                                        false;
-                                                  });
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        "Submissions exported successfully",
-                                                      ),
-                                                    ),
-                                                  );
-                                                });
-                                              },
-                                      icon:
-                                          _submissionsLoading[index] == true
-                                              ? const SizedBox(
-                                                height: 16,
-                                                width: 16,
-                                                child: CircularProgressIndicator(
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.white),
-                                                  strokeWidth: 2,
-                                                ),
-                                              )
-                                              : const Icon(Icons.file_download),
-                                      label: const Text("Export Submissions"),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppStyles.buttonColor,
                                         shape: RoundedRectangleBorder(

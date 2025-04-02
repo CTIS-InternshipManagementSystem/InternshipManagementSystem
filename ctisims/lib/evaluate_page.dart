@@ -116,13 +116,16 @@ class _EvaluatePageState extends State<EvaluatePage> {
       String grade;
       try {
         final gradeData = await DBHelper.getGrade(bilkentId, assignment['id'], courseId);
-        grade = gradeData != null && gradeData['grade'] != null
-            ? gradeData['grade'].toString()
+        final gradeSnapshot = await gradeData.first;
+        grade = gradeSnapshot != null && gradeSnapshot['grade'] != null
+            ? gradeSnapshot['grade'].toString()
             : "not graded";
       } catch (e) {
         grade = "not graded";
       }
+      // Add assignment id along with name and grade.
       assignmentsWithGrade.add({
+        'id': assignment['id'],
         'name': assignment['name'],
         'grade': grade,
       });
@@ -169,6 +172,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
+          // Reverted extraction block:
           final student = snapshot.data!['student'] ?? {};
           final courseData = snapshot.data!['course'] ?? {};
           final studentName = student['name'] ?? 'Unknown';
@@ -178,7 +182,6 @@ class _EvaluatePageState extends State<EvaluatePage> {
           final code = courseData['code'] ?? '310';
           final destinationBase = "${year} ${semester}/CTIS$code/${studentName}_$bilkentId";
           final List assignments = snapshot.data!['assignments'];
-          
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -237,15 +240,28 @@ class _EvaluatePageState extends State<EvaluatePage> {
                         Text("Assignments", style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 8),
                         ...assignments.map((assignment) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text("${assignment['name']}", style: TextStyle(color: textColor)),
-                                Text("Grade: ${assignment['grade']}", style: TextStyle(color: textColor)),
-                              ],
+                          return StreamBuilder<Map<String, dynamic>?>(
+                            initialData: {'grade': assignment['grade']},
+                            stream: DBHelper.getGrade(
+                              bilkentId,
+                              assignment['id'],
+                              courseData['courseId'],
                             ),
+                            builder: (context, asyncSnapshot) {
+                              final grade = asyncSnapshot.data != null && asyncSnapshot.data!['grade'] != null
+                                  ? asyncSnapshot.data!['grade'].toString()
+                                  : assignment['grade'];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text("${assignment['name']}"),
+                                    Text("Grade: $grade"),
+                                  ],
+                                ),
+                              );
+                            },
                           );
                         }).toList(),
                       ],
@@ -273,7 +289,7 @@ class _EvaluatePageState extends State<EvaluatePage> {
                 if (courseData['code'] == '290') ...[
                   _buildCTIS290Section(),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 16),  
                 // Company Evaluation Section
                 Card(
                   elevation: AppStyles.cardElevation,
