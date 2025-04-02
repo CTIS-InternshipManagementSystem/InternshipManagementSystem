@@ -5,6 +5,7 @@ import 'package:ctisims/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dashboard_page.dart';
+import 'animation_demo.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:async/async.dart';
@@ -127,6 +128,17 @@ class AppStyles {
   static const borderRadius = 16.0;
   static const padding = EdgeInsets.all(16.0);
   static const fieldSpacing = SizedBox(height: 16);
+  
+  // Helper method to get color based on theme
+  static Color getButtonColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+        ? Colors.lightBlue 
+        : Colors.blue;
+  }
+  
+  static Color getPrimaryColor(BuildContext context) {
+    return Colors.orange;
+  }
 }
 
 // Reusable gesture button widget for consistent button styling
@@ -451,7 +463,7 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: AppStyles.padding,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? Colors.grey[850] : Colors.white,
                 borderRadius: BorderRadius.circular(AppStyles.borderRadius),
                 boxShadow: [
                   BoxShadow(
@@ -580,6 +592,9 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -588,8 +603,8 @@ class _HomePageState extends State<HomePage> {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return WillPopScope(
+          // Reset any selections when modal is closed
           onWillPop: () async {
-            // Reset any selections when modal is closed
             homePageModel.updateSelectedStudent(null);
             homePageModel.updateSelectedCourse(null);
             homePageModel.updateRole(null);

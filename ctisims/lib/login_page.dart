@@ -2,6 +2,9 @@ import 'package:ctisims/dbHelper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_page.dart';
+import 'package:provider/provider.dart';
+import 'themes/Theme_provider.dart';
+import 'animated_button.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -93,12 +96,24 @@ class _LoginPageState extends State<LoginPage> {
   
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
     return Scaffold(
-      backgroundColor: Colors.white, // Lighter background for better contrast
       appBar: AppBar(
         title: const Text('CTIS IMS Login'),
-        backgroundColor: Colors.orange,
-        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+        ],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -181,25 +196,14 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
+                          child: AnimatedButton(
+                            label: 'Login',
+                            icon: Icons.login,
                             onPressed: _isLoading ? null : _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue, // Vivid button color for better visibility
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Login', style: TextStyle(fontSize: 16, color: Colors.white)),
+                            isLoading: _isLoading,
+                            color: Colors.blue,
+                            width: double.infinity,
+                            animationType: AnimationType.glow,
                           ),
                         ),
                       ],
