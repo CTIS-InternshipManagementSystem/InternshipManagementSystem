@@ -63,8 +63,9 @@ class _SubmissionPageState extends State<SubmissionPage> {
       String grade;
       try {
         final gradeData = await DBHelper.getGrade(bilkentId, assignment['id'], courseId);
-        grade = gradeData != null && gradeData['grade'] != null
-            ? gradeData['grade'].toString()
+        final gradeSnapshot = await gradeData.first;
+        grade = gradeSnapshot != null && gradeSnapshot['grade'] != null
+            ? gradeSnapshot['grade'].toString()
             : "not graded";
       } catch (e) {
         grade = "not graded";
@@ -376,23 +377,6 @@ class _SubmissionPageState extends State<SubmissionPage> {
               color: AppStyles.buttonColor,
               animationType: AnimationType.scale,
             ),
-            // FOR TESTING ONLY - Remove in production
-            if (title == 'Follow Up 1') ...[
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  // Force show the success dialog regardless of file upload
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  _showCenteredSuccessNotification('test_file.pdf', 12345);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('TEST DIALOG (Click Here)'),
-              ),
-            ],
           ],
         ),
       ),
