@@ -657,21 +657,48 @@ class DBHelper {
     String assignmentName,
     double grade,
   ) async {
-    final assingment = await getAssignmentwithName(assignmentName, courseId);
-
-    if (assingment.isEmpty) {
-      throw Exception(
-        'Assignment not found for name: $assignmentName and courseId: $courseId',
-      );
+    final assignments = await getAssignmentwithName(assignmentName, courseId);
+    Map<String, dynamic> assignment;
+    if (assignments.isEmpty) {
+      if (assignmentName == "Company Evaluation") {
+        // Create new assignment document for Company Evaluation if it doesn't exist.
+        DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+        await newAssignment.set({
+          'courseId': courseId,
+          'name': assignmentName,
+          'deadline': Timestamp.now(), // default deadline
+          'courseCode': courseId,      // fallback value
+          'id': newAssignment.id,
+        });
+        assignment = {'id': newAssignment.id};
+      } else {
+        throw Exception('Assignment not found for name: $assignmentName and courseId: $courseId');
+      }
+    } else {
+      assignment = assignments.first;
     }
-
-    var doc = await _firestore.collection('Grade');
-    doc.add({
-      'bilkentId': bilkentId,
-      'courseId': courseId,
-      'assignmentId': assingment[0]['id'],
-      'grade': grade,
-    });
+    
+    // Look for an existing Grade document for this student and assignment.
+    final gradeSnapshot = await _firestore
+        .collection('Grade')
+        .where('bilkentId', isEqualTo: bilkentId)
+        .where('courseId', isEqualTo: courseId)
+        .where('assignmentId', isEqualTo: assignment['id'])
+        .limit(1)
+        .get();
+    
+    if (gradeSnapshot.docs.isNotEmpty) {
+      await gradeSnapshot.docs.first.reference.update({
+        'grade': grade,
+      });
+    } else {
+      await _firestore.collection('Grade').add({
+        'bilkentId': bilkentId,
+        'courseId': courseId,
+        'assignmentId': assignment['id'],
+        'grade': grade,
+      });
+    }
   }
 
   /// Belirtilen kursa ait tüm notları getirir.
@@ -927,25 +954,25 @@ class DBHelper {
   }
 
   // Get grade for a given student and assignment
-  static Future<Map<String, dynamic>?> getGrade(
+  static Stream<Map<String, dynamic>?> getGrade(
     String bilkentId,
     String assignmentId,
     String courseId,
-  ) async {
-    final snapshot =
-        await _firestore
-            .collection('Grade')
-            .where('bilkentId', isEqualTo: bilkentId)
-            .where('assignmentId', isEqualTo: assignmentId)
-            .where('courseId', isEqualTo: courseId)
-            .limit(1)
-            .get();
-    if (snapshot.docs.isNotEmpty) {
-      return snapshot.docs.first.data() as Map<String, dynamic>;
-      debugPrint(
-        "Grade found for student $bilkentId, assignment $assignmentId, grade: ${snapshot.docs.first.data()['grade']}",
-      );
-    }
-    return null;
+  ) {
+    return _firestore
+        .collection('Grade')
+        .where('bilkentId', isEqualTo: bilkentId)
+        .where('assignmentId', isEqualTo: assignmentId)
+        .where('courseId', isEqualTo: courseId)
+        .snapshots()
+        .map((snapshot) {
+          if (snapshot.docs.isNotEmpty) {
+            return {
+              'id': snapshot.docs.first.id,
+              ...?snapshot.docs.first.data() as Map<String, dynamic>?,
+            };
+          }
+          return null;
+        });
   }
 }

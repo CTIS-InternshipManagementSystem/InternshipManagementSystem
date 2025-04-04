@@ -5,11 +5,13 @@ import 'package:ctisims/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dashboard_page.dart';
+import 'animation_demo.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:async/async.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/rendering.dart';
+import 'package:ctisims/themes/Theme_provider.dart';
 
 class HomePageModel extends ChangeNotifier {
   String? selectedYear;
@@ -126,6 +128,17 @@ class AppStyles {
   static const borderRadius = 16.0;
   static const padding = EdgeInsets.all(16.0);
   static const fieldSpacing = SizedBox(height: 16);
+  
+  // Helper method to get color based on theme
+  static Color getButtonColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark 
+        ? Colors.lightBlue 
+        : Colors.blue;
+  }
+  
+  static Color getPrimaryColor(BuildContext context) {
+    return Colors.orange;
+  }
 }
 
 // Reusable gesture button widget for consistent button styling
@@ -371,87 +384,73 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS'),
         backgroundColor: AppStyles.primaryColor,
         actions: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => DashboardPage(
-                          registeredSemesters:
-                              _registeredSemesters
-                                  .map(
-                                    (item) => Map<String, String>.fromEntries(
-                                      item.entries.map(
-                                        (e) =>
-                                            MapEntry(e.key, e.value.toString()),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                          userData: widget.userData, // pass the userData
-                        ),
-                  ),
-                );
-              },
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    'Dashboard',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+          // Dashboard Button
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DashboardPage(
+                    registeredSemesters: _registeredSemesters
+                        .map(
+                          (item) => Map<String, String>.fromEntries(
+                            item.entries.map(
+                              (e) => MapEntry(e.key, e.value.toString()),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    userData: widget.userData,
                   ),
                 ),
-              ),
+              );
+            },
+            child: const Text(
+              'Dashboard',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {},
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    '${widget.userData.username}',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ),
-              ),
+          // Username Display
+          TextButton(
+            onPressed: () {},
+            child: Text(
+              '${widget.userData.username}',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-              splashColor: Colors.white24,
-              highlightColor: Colors.white10,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Center(
-                  child: Text(
-                    'Logout',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
+          // Dark Mode Toggle
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+          // Logout Button
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginPage(),
                 ),
-              ),
+              );
+            },
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
         ],
@@ -464,7 +463,7 @@ class _HomePageState extends State<HomePage> {
             Container(
               padding: AppStyles.padding,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? Colors.grey[850] : Colors.white,
                 borderRadius: BorderRadius.circular(AppStyles.borderRadius),
                 boxShadow: [
                   BoxShadow(
@@ -593,6 +592,9 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.isDarkMode;
+    
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -601,8 +603,8 @@ class _HomePageState extends State<HomePage> {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return WillPopScope(
+          // Reset any selections when modal is closed
           onWillPop: () async {
-            // Reset any selections when modal is closed
             homePageModel.updateSelectedStudent(null);
             homePageModel.updateSelectedCourse(null);
             homePageModel.updateRole(null);
