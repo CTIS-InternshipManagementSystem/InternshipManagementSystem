@@ -8,7 +8,7 @@ import 'animated_button.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
-  
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
 
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
-  
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +36,7 @@ class _LoginPageState extends State<LoginPage> {
       });
     });
   }
-  
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -45,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     _passwordFocusNode.dispose();
     super.dispose();
   }
-  
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -64,7 +64,8 @@ class _LoginPageState extends State<LoginPage> {
       );
       if (userData == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unexpected error: User data is null.')));
+          const SnackBar(content: Text('Unexpected error: User data is null.')),
+        );
       } else {
         Navigator.pushReplacement(
           context,
@@ -74,9 +75,9 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: ${e.toString()}')));
       print('Login is unsuccessful: $e');
     } finally {
       if (mounted) {
@@ -90,15 +91,17 @@ class _LoginPageState extends State<LoginPage> {
   void _forgotPassword() {
     // TODO: Implement forgot password logic (e.g., sending a reset email)
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Forgot Password functionality not implemented.')),
+      const SnackBar(
+        content: Text('Forgot Password functionality not implemented.'),
+      ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS Login'),
@@ -136,17 +139,33 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(height: 16),
-                        Image.asset(
-                          'assets/images/bilkent-logo.png',
-                            height: 80,
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.orange,
+                              width: 2.0,
                             ),
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/ims_logo.png',
+                              height: 100,
+                              width: 100,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _emailController,
                           focusNode: _emailFocusNode,
                           decoration: const InputDecoration(
                             labelText: 'Email',
-                            prefixIcon: Icon(Icons.email, semanticLabel: 'Email icon'),
+                            prefixIcon: Icon(
+                              Icons.email,
+                              semanticLabel: 'Email icon',
+                            ),
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.emailAddress,
@@ -163,12 +182,20 @@ class _LoginPageState extends State<LoginPage> {
                           focusNode: _passwordFocusNode,
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock, semanticLabel: 'Lock icon'),
+                            prefixIcon: const Icon(
+                              Icons.lock,
+                              semanticLabel: 'Lock icon',
+                            ),
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureText ? Icons.visibility : Icons.visibility_off,
-                                semanticLabel: _obscureText ? 'Show password' : 'Hide password',
+                                _obscureText
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                semanticLabel:
+                                    _obscureText
+                                        ? 'Show password'
+                                        : 'Hide password',
                               ),
                               onPressed: () {
                                 setState(() {
