@@ -1,4 +1,4 @@
-import 'package:ctisims/dbHelper.dart';
+import 'package:ctisims/db_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_page.dart';
