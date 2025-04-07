@@ -2,7 +2,7 @@
 
 A comprehensive Flutter application designed to manage and track student internships for academic institutions. This system allows students, instructors, and administrators to handle the entire internship process in one centralized platform.
 
-![bilkent-lgo](https://github.com/user-attachments/assets/07f0548a-2e85-4c23-98da-d9789fb3605f)
+![logo-ctis](https://github.com/user-attachments/assets/d113a1c1-7a39-4006-8ee1-72b8bddb801f)
 
 
 ## Table of Contents
