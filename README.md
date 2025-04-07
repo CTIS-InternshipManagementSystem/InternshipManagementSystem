@@ -2,7 +2,8 @@
 
 A comprehensive Flutter application designed to manage and track student internships for academic institutions. This system allows students, instructors, and administrators to handle the entire internship process in one centralized platform.
 
-![logo-ctis](https://github.com/user-attachments/assets/d113a1c1-7a39-4006-8ee1-72b8bddb801f)
+[![CTIS IMS](https://img.youtube.com/vi/W8yAaMPWGFY/0.jpg)](https://youtu.be/W8yAaMPWGFY)
+
 
 
 ## Table of Contents
