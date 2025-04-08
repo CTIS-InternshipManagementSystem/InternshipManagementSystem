@@ -193,7 +193,7 @@ The application supports both light and dark themes:
 
 This project was developed by:
 
-- **Hikmet Aydogan** - Frontend Developer & UI Design
+- **Hikmet Bozkurt Aydoğan** - Frontend Developer & UI Design
   - Email: hkmtbzkrt06@gmail.com
   - GitHub: [hikmetbozkurt](https://github.com/hikmetbozkurt)
 
