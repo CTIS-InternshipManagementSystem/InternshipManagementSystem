@@ -316,10 +316,15 @@ class _HomePageState extends State<HomePage> {
         // Find supervisor from Firebase-loaded supervisors
         final selectedSupervisor = homePageModel.supervisors.firstWhere(
           (supervisor) => supervisor['name'] == selectedSupervisorName,
-          orElse: () => {'bilkentId': '', 'name': ''},
+          orElse:
+              () => {
+                'bilkentId': '0',
+                'name': '',
+              }, // Default value with a valid String for bilkentId
         );
 
-        supervisorId = selectedSupervisor['bilkentId'] as String;
+        // Ensure supervisorId is never null
+        supervisorId = selectedSupervisor['bilkentId']?.toString() ?? '0';
         debugPrint("Selected supervisor ID: $supervisorId");
       }
 
