@@ -88,14 +88,25 @@ class DBHelper {
       throw Exception('Bilkent ID already exists');
     }
 
-    // Add new user
-    await _firestore.collection('User').add({
-      'name': name,
-      'email': email,
-      'bilkentId': bilkentId,
-      'role': role,
-      'supervisorId': supervisor,
-    });
+    try {
+      // Generate a document ID based on bilkentId to ensure consistency
+      String docId = 'user_$bilkentId';
+      
+      // Use doc() and set() instead of add() to specify the document ID
+      await _firestore.collection('User').doc(docId).set({
+        'name': name,
+        'email': email,
+        'bilkentId': bilkentId,
+        'role': role,
+        'supervisorId': supervisor,
+        'createdAt': FieldValue.serverTimestamp(), // Add timestamp for tracking
+      });
+      
+      debugPrint('User added successfully with ID: $docId');
+    } catch (e) {
+      debugPrint('Error adding user to Firestore: $e');
+      throw Exception('Failed to add user: $e');
+    }
   }
 
   /// Belirtilen bilkentId'ye sahip kullanıcıyı getirir.
@@ -151,6 +162,59 @@ class DBHelper {
           .toList();
     }
     throw Exception('Failed to fetch student info');
+  }
+
+  /// Get all supervisors (Admin users) from Firebase
+  static Future<List<Map<String, dynamic>>> getAllSupervisors() async {
+    try {
+      final snapshot = await _firestore
+          .collection('User')
+          .where('role', isEqualTo: 'Admin')
+          .get();
+          
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  'bilkentId': doc.data()['bilkentId'] as String,
+                  'name': doc.data()['name'] as String,
+                  'email': doc.data()['email'] as String,
+                  ...doc.data() as Map<String, dynamic>
+                })
+            .toList();
+      }
+      debugPrint("No supervisors found in Firebase");
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching supervisors from Firebase: $e");
+      return [];
+    }
+  }
+
+  /// Get students by supervisor ID
+  static Future<List<Map<String, dynamic>>> getStudentsBySupervisor(String supervisorId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('User')
+          .where('role', isEqualTo: 'Student')
+          .where('supervisorId', isEqualTo: supervisorId)
+          .get();
+          
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  'bilkentId': doc.data()['bilkentId'] as String,
+                  'name': doc.data()['name'] as String,
+                  ...doc.data() as Map<String, dynamic>
+                })
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching students by supervisor: $e");
+      return [];
+    }
   }
 
   // --- Course İşlemleri ---

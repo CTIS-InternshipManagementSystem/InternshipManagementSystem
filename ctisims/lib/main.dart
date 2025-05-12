@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'themes/Theme_provider.dart';
 import 'themes/app_themes.dart';
 import 'splash_screen.dart';
+import 'providers/favorites_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => HomePageModel()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
       ],
       child: const MyApp(),
     ),

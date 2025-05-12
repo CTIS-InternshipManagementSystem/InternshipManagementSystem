@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ✅ Add this
+import 'package:provider/provider.dart'; 
 import 'package:ctisims/db_helper.dart';
 import 'submission_page.dart';
 import 'assigned_submissions_page.dart';
 import 'export_page.dart';
 import 'search_page.dart';
-import 'login_page.dart'; // For UserData
-import 'themes/Theme_provider.dart'; // ✅ Add this
+import 'login_page.dart'; 
+import 'themes/Theme_provider.dart'; 
 
 class DashboardPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters;
@@ -48,6 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
       } else {
         courses = await DBHelper.getCourseForStudent(widget.userData.bilkentId);
       }
+      if (!mounted) return;
       setState(() {
         allCourses = courses.map((course) {
           return {
@@ -335,12 +336,12 @@ class _DashboardPageState extends State<DashboardPage> {
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
                 hintText: "Search courses...",
-                hintStyle: TextStyle(color: textColor.withOpacity(0.6)),
+                hintStyle: TextStyle(color: textColor.withAlpha((0.6 * 255).toInt())),
                 prefixIcon: Icon(Icons.search, color: textColor),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: textColor.withOpacity(0.4)),
+                  borderSide: BorderSide(color: textColor.withAlpha((0.4 * 255).toInt())),
                 ),
               ),
             ),

@@ -119,6 +119,18 @@ class HomePageModel extends ChangeNotifier {
       debugPrint("Error loading data from local DB: $e");
     }
   }
+
+  // Load supervisors from Firebase
+  Future<void> loadSupervisors() async {
+    try {
+      final supervisors = await DBHelper.getAllSupervisors();
+      _supervisors = supervisors;
+      notifyListeners();
+      debugPrint("Loaded ${supervisors.length} supervisors from Firebase");
+    } catch (e) {
+      debugPrint("Error loading supervisors from Firebase: $e");
+    }
+  }
 }
 
 class AppStyles {
@@ -282,7 +294,7 @@ class _HomePageState extends State<HomePage> {
 
       String supervisorId;
       if (selectedRole == 'Admin') {
-        supervisorId = "0";
+        supervisorId = "0"; // Default for admin users
       } else {
         final selectedSupervisorName = homePageModel.selectedSupervisor;
         if (selectedSupervisorName == null) {
@@ -292,28 +304,17 @@ class _HomePageState extends State<HomePage> {
           return;
         }
 
-        // Find the supervisor ID
-        final supervisors = homePageModel.supervisors;
-        final selectedSupervisor = supervisors.firstWhere(
+        // Find supervisor from Firebase-loaded supervisors
+        final selectedSupervisor = homePageModel.supervisors.firstWhere(
           (supervisor) => supervisor['name'] == selectedSupervisorName,
-          orElse: () => {'id': '', 'name': ''},
+          orElse: () => {'bilkentId': '', 'name': ''},
         );
-        supervisorId = selectedSupervisor['id'] as String;
+        
+        supervisorId = selectedSupervisor['bilkentId'] as String;
+        debugPrint("Selected supervisor ID: $supervisorId");
       }
 
-      // Create user map for local DB
-      final user = {
-        'bilkentId': _bilkentIdController.text,
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'role': selectedRole,
-        'supervisorId': supervisorId,
-      };
-
-      // Add to local DB
-      await LocalDBHelper.instance.createUser(user);
-
-      // Add to Firebase
+      // Add to Firebase only (skip LocalDB)
       await DBHelper.addUser(
         _nameController.text,
         _emailController.text,
@@ -333,14 +334,17 @@ class _HomePageState extends State<HomePage> {
         email: _emailController.text,
       );
 
-      // Reload data from local DB
-      await homePageModel.loadDataFromLocalDB();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('User added and password reset email sent'),
         ),
       );
+      
+      // Clear form fields after successful addition
+      _nameController.clear();
+      _emailController.clear();
+      _bilkentIdController.clear();
+      
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -357,6 +361,10 @@ class _HomePageState extends State<HomePage> {
     _deadline310 = DBHelper.getActiveCourseAssignments("310");
     _deadline290 = DBHelper.getActiveCourseAssignments("290");
     _loadData();
+    
+    // Load supervisors from Firebase
+    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    homePageModel.loadSupervisors();
   }
 
   Future<void> _loadData() async {
@@ -1107,24 +1115,32 @@ class _HomePageState extends State<HomePage> {
               AppStyles.fieldSpacing,
               // Only show supervisor dropdown when role is Student
               if (homePageModel.selectedRole == 'Student')
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: homePageModel.selectedSupervisor,
-                  decoration: const InputDecoration(
-                    labelText: 'Supervisor',
-                    border: OutlineInputBorder(),
-                  ),
-                  items:
-                      homePageModel.supervisors
-                          .map(
-                            (supervisor) => DropdownMenuItem(
-                              value: supervisor['name'] as String,
-                              child: Text(supervisor['name'] as String),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    homePageModel.updateSupervisor(value);
+                FutureBuilder<void>(
+                  future: homePageModel.supervisors.isEmpty 
+                      ? homePageModel.loadSupervisors() 
+                      : null,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    return DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: homePageModel.selectedSupervisor,
+                      decoration: const InputDecoration(
+                        labelText: 'Supervisor',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: homePageModel.supervisors.map(
+                        (supervisor) => DropdownMenuItem(
+                          value: supervisor['name'] as String,
+                          child: Text(supervisor['name'] as String),
+                        ),
+                      ).toList(),
+                      onChanged: (value) {
+                        homePageModel.updateSupervisor(value);
+                      },
+                    );
                   },
                 ),
               if (homePageModel.selectedRole == 'Student')
