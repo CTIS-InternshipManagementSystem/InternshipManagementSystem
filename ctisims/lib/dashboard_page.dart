@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ✅ Add this
+import 'package:provider/provider.dart';
 import 'package:ctisims/db_helper.dart';
 import 'submission_page.dart';
 import 'assigned_submissions_page.dart';
 import 'export_page.dart';
 import 'search_page.dart';
-import 'login_page.dart'; // For UserData
-import 'themes/Theme_provider.dart'; // ✅ Add this
+import 'login_page.dart';
+import 'themes/Theme_provider.dart';
+import 'students_by_supervisor_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final List<Map<String, String>> registeredSemesters;
@@ -48,48 +49,75 @@ class _DashboardPageState extends State<DashboardPage> {
       } else {
         courses = await DBHelper.getCourseForStudent(widget.userData.bilkentId);
       }
+
+      if (!mounted) return;
+
+      // Handle empty courses case
+      if (courses.isEmpty) {
+        debugPrint("No courses found for user: ${widget.userData.bilkentId}");
+      }
+
       setState(() {
-        allCourses = courses.map((course) {
-          return {
-            'year': course['year'],
-            'semester': course['semester'],
-            'code': course['code'],
-            'courseId': course['courseId'],
-            'role': course['role'] ?? '',
-          };
-        }).toList();
+        allCourses =
+            courses.map((course) {
+              return {
+                'year': course['year'],
+                'semester': course['semester'],
+                'code': course['code'],
+                'courseId': course['courseId'],
+                'role': course['role'] ?? '',
+              };
+            }).toList();
         filteredSemesters = List.from(allCourses);
         _applyFilters();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching courses: $e')),
-      );
+      if (!mounted) return;
+
+      // Don't show error message for empty data
+      if (e.toString().contains('No active course found') ||
+          e.toString().contains('No courses found')) {
+        debugPrint("Info: $e");
+        setState(() {
+          allCourses = [];
+          filteredSemesters = [];
+        });
+      } else {
+        debugPrint("Error fetching courses: $e");
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
   void _applyFilters() {
     setState(() {
-      filteredSemesters = allCourses.where((course) {
-        bool matches = true;
-        if (searchQuery.isNotEmpty) {
-          matches = matches &&
-              (course['code']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
-        }
-        if (roleFilter != "All") {
-          matches = matches && (course['role'] == roleFilter);
-        }
-        if (yearFilter != "All") {
-          matches = matches && (course['year'] == yearFilter);
-        }
-        if (semesterFilter != "All") {
-          matches = matches && (course['semester'] == semesterFilter);
-        }
-        if (courseFilter != "All") {
-          matches = matches && (course['code'] == courseFilter);
-        }
-        return matches;
-      }).toList();
+      filteredSemesters =
+          allCourses.where((course) {
+            bool matches = true;
+            if (searchQuery.isNotEmpty) {
+              matches =
+                  matches &&
+                  (course['code']?.toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      ) ??
+                      false);
+            }
+            if (roleFilter != "All") {
+              matches = matches && (course['role'] == roleFilter);
+            }
+            if (yearFilter != "All") {
+              matches = matches && (course['year'] == yearFilter);
+            }
+            if (semesterFilter != "All") {
+              matches = matches && (course['semester'] == semesterFilter);
+            }
+            if (courseFilter != "All") {
+              matches = matches && (course['code'] == courseFilter);
+            }
+            return matches;
+          }).toList();
       _sortSemesters();
     });
   }
@@ -103,22 +131,34 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       switch (sortOption) {
         case "Year Ascending":
-          filteredSemesters.sort((a, b) => (a['year'] ?? "").compareTo(b['year'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (a['year'] ?? "").compareTo(b['year'] ?? ""),
+          );
           break;
         case "Year Descending":
-          filteredSemesters.sort((a, b) => (b['year'] ?? "").compareTo(a['year'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (b['year'] ?? "").compareTo(a['year'] ?? ""),
+          );
           break;
         case "Semester Ascending":
-          filteredSemesters.sort((a, b) => (a['semester'] ?? "").compareTo(b['semester'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (a['semester'] ?? "").compareTo(b['semester'] ?? ""),
+          );
           break;
         case "Semester Descending":
-          filteredSemesters.sort((a, b) => (b['semester'] ?? "").compareTo(a['semester'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (b['semester'] ?? "").compareTo(a['semester'] ?? ""),
+          );
           break;
         case "Course Ascending":
-          filteredSemesters.sort((a, b) => (a['code'] ?? "").compareTo(b['code'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (a['code'] ?? "").compareTo(b['code'] ?? ""),
+          );
           break;
         case "Course Descending":
-          filteredSemesters.sort((a, b) => (b['code'] ?? "").compareTo(a['code'] ?? ""));
+          filteredSemesters.sort(
+            (a, b) => (b['code'] ?? "").compareTo(a['code'] ?? ""),
+          );
           break;
       }
     });
@@ -158,12 +198,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     labelText: "Role",
                     labelStyle: TextStyle(color: textColor),
                   ),
-                  items: ["All", "Student", "Admin"].map((value) {
-                    return DropdownMenuItem(
-                      value: value, 
-                      child: Text(value, style: TextStyle(color: textColor)),
-                    );
-                  }).toList(),
+                  items:
+                      ["All", "Student", "Admin"].map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(color: textColor),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (val) => tempRole = val!,
                 ),
                 const SizedBox(height: 8),
@@ -175,12 +219,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     labelText: "Year",
                     labelStyle: TextStyle(color: textColor),
                   ),
-                  items: years.map((value) {
-                    return DropdownMenuItem(
-                      value: value, 
-                      child: Text(value, style: TextStyle(color: textColor)),
-                    );
-                  }).toList(),
+                  items:
+                      years.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(color: textColor),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (val) => tempYear = val!,
                 ),
                 const SizedBox(height: 8),
@@ -192,12 +240,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     labelText: "Semester",
                     labelStyle: TextStyle(color: textColor),
                   ),
-                  items: ["All", "Fall", "Spring"].map((value) {
-                    return DropdownMenuItem(
-                      value: value, 
-                      child: Text(value, style: TextStyle(color: textColor)),
-                    );
-                  }).toList(),
+                  items:
+                      ["All", "Fall", "Spring"].map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(color: textColor),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (val) => tempSemester = val!,
                 ),
                 const SizedBox(height: 8),
@@ -209,12 +261,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     labelText: "Course",
                     labelStyle: TextStyle(color: textColor),
                   ),
-                  items: courses.map((value) {
-                    return DropdownMenuItem(
-                      value: value, 
-                      child: Text(value, style: TextStyle(color: textColor)),
-                    );
-                  }).toList(),
+                  items:
+                      courses.map((value) {
+                        return DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(color: textColor),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (val) => tempCourse = val!,
                 ),
               ],
@@ -222,8 +278,13 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context), 
-              child: Text("Cancel", style: TextStyle(color: isDark ? Colors.lightBlue : Colors.blue)),
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                "Cancel",
+                style: TextStyle(
+                  color: isDark ? Colors.lightBlue : Colors.blue,
+                ),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -236,7 +297,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 _applyFilters();
                 Navigator.pop(context);
               },
-              child: Text("Reset", style: TextStyle(color: isDark ? Colors.lightBlue : Colors.blue)),
+              child: Text(
+                "Reset",
+                style: TextStyle(
+                  color: isDark ? Colors.lightBlue : Colors.blue,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -249,9 +315,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _applyFilters();
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               child: const Text("Apply"),
             ),
           ],
@@ -268,7 +332,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final textColor = isDark ? Colors.white : Colors.black;
     final bgColor = isDark ? Colors.grey[900] : Colors.grey[100]!;
     final cardBgColor = isDark ? Colors.grey[850]! : Colors.white;
-    
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -276,13 +340,13 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: Icon(
-            isDark ? Icons.dark_mode : Icons.light_mode,
-            color: Colors.grey,
-              ),
-              tooltip: 'Toggle Dark Mode',
-              onPressed: () {
-                themeProvider.toggleTheme();
-              },
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.grey,
+            ),
+            tooltip: 'Toggle Dark Mode',
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
           ),
           if (widget.userData.role == 'Admin') ...[
             TextButton(
@@ -290,11 +354,31 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ExportPage(registeredSemesters: widget.registeredSemesters),
+                    builder: (context) => const StudentsBySupervisorPage(),
                   ),
                 );
               },
-              child: const Text('Statistics & Grades', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Students by Supervisor',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => ExportPage(
+                          registeredSemesters: widget.registeredSemesters,
+                        ),
+                  ),
+                );
+              },
+              child: const Text(
+                'Statistics & Grades',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -303,7 +387,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   MaterialPageRoute(builder: (context) => const SearchPage()),
                 );
               },
-              child: const Text('Search', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Search',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ],
@@ -314,6 +401,10 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             _buildSearchHeader(textColor, cardBgColor),
             const SizedBox(height: 16),
+            if (widget.userData.role == 'Admin') ...[
+              _buildSupervisorCard(cardBgColor, textColor),
+              const SizedBox(height: 16),
+            ],
             _buildCourseGrid(cardBgColor, textColor),
           ],
         ),
@@ -335,12 +426,18 @@ class _DashboardPageState extends State<DashboardPage> {
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
                 hintText: "Search courses...",
-                hintStyle: TextStyle(color: textColor.withOpacity(0.6)),
+                hintStyle: TextStyle(
+                  color: textColor.withAlpha((0.6 * 255).toInt()),
+                ),
                 prefixIcon: Icon(Icons.search, color: textColor),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: textColor.withOpacity(0.4)),
+                  borderSide: BorderSide(
+                    color: textColor.withAlpha((0.4 * 255).toInt()),
+                  ),
                 ),
               ),
             ),
@@ -358,19 +455,23 @@ class _DashboardPageState extends State<DashboardPage> {
                 DropdownButton<String>(
                   value: sortOption,
                   dropdownColor: cardBgColor,
-                  items: <String>[
-                    "Year Ascending",
-                    "Year Descending",
-                    "Semester Ascending",
-                    "Semester Descending",
-                    "Course Ascending",
-                    "Course Descending"
-                  ].map((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value, style: TextStyle(color: textColor)),
-                    );
-                  }).toList(),
+                  items:
+                      <String>[
+                        "Year Ascending",
+                        "Year Descending",
+                        "Semester Ascending",
+                        "Semester Descending",
+                        "Course Ascending",
+                        "Course Descending",
+                      ].map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(
+                            value,
+                            style: TextStyle(color: textColor),
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {
@@ -388,13 +489,116 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildSupervisorCard(Color cardBgColor, Color textColor) {
+    return Card(
+      elevation: 4,
+      color: cardBgColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            Icon(Icons.people, size: 40, color: Colors.blue),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'View Students by Supervisor',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'View and export a list of students assigned to each supervisor',
+                    style: TextStyle(color: textColor.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentsBySupervisorPage(),
+                  ),
+                );
+              },
+              child: const Text('View', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCourseGrid(Color cardBgColor, Color textColor) {
     return Expanded(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          int crossAxisCount = constraints.maxWidth >= 1200
-              ? 3
-              : constraints.maxWidth >= 800
+          if (filteredSemesters.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.school_outlined, size: 70, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Courses Found',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'There are currently no active courses to display.',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: textColor.withOpacity(0.7),
+                    ),
+                  ),
+                  if (widget.userData.role == 'Admin') ...[
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.add_circle_outline),
+                      label: const Text('Create New Course'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }
+
+          int crossAxisCount =
+              constraints.maxWidth >= 1200
+                  ? 3
+                  : constraints.maxWidth >= 800
                   ? 2
                   : 1;
 
@@ -409,12 +613,16 @@ class _DashboardPageState extends State<DashboardPage> {
             itemBuilder: (context, index) {
               final semester = filteredSemesters[index];
               final String buttonText =
-                  widget.userData.role == 'Admin' ? 'Evaluate Submission' : 'View Submission';
+                  widget.userData.role == 'Admin'
+                      ? 'Evaluate Submission'
+                      : 'View Submission';
 
               return Card(
                 color: cardBgColor,
                 elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -424,17 +632,21 @@ class _DashboardPageState extends State<DashboardPage> {
                         children: [
                           Text(
                             semester['year'] ?? '',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
                           ),
                           Text(
                             semester['semester'] ?? '',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
                           ),
                         ],
                       ),
@@ -442,10 +654,12 @@ class _DashboardPageState extends State<DashboardPage> {
                       Center(
                         child: Text(
                           "CTIS ${semester['code'] ?? ''}",
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: textColor,
-                              ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
                         ),
                       ),
                       const Spacer(),
@@ -464,30 +678,39 @@ class _DashboardPageState extends State<DashboardPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      AssignedSubmissionsPage(courseId: semester['courseId']),
+                                  builder:
+                                      (context) => AssignedSubmissionsPage(
+                                        courseId: semester['courseId'],
+                                      ),
                                 ),
                               );
                             } else {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => SubmissionPage(
-                                    submission: {
-                                      'bilkentId': widget.userData.bilkentId,
-                                      'name': widget.userData.username,
-                                      'role': widget.userData.role,
-                                      'courseId': semester['courseId'] ?? '',
-                                      'year': semester['year'] ?? '',
-                                      'semester': semester['semester'] ?? '',
-                                      'code': semester['code'] ?? '',
-                                    },
-                                  ),
+                                  builder:
+                                      (context) => SubmissionPage(
+                                        submission: {
+                                          'bilkentId':
+                                              widget.userData.bilkentId,
+                                          'name': widget.userData.username,
+                                          'role': widget.userData.role,
+                                          'courseId':
+                                              semester['courseId'] ?? '',
+                                          'year': semester['year'] ?? '',
+                                          'semester':
+                                              semester['semester'] ?? '',
+                                          'code': semester['code'] ?? '',
+                                        },
+                                      ),
                                 ),
                               );
                             }
                           },
-                          child: Text(buttonText, style: const TextStyle(color: Colors.white)),
+                          child: Text(
+                            buttonText,
+                            style: const TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                     ],

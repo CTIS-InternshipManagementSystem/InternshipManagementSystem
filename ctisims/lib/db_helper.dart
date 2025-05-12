@@ -88,14 +88,25 @@ class DBHelper {
       throw Exception('Bilkent ID already exists');
     }
 
-    // Add new user
-    await _firestore.collection('User').add({
-      'name': name,
-      'email': email,
-      'bilkentId': bilkentId,
-      'role': role,
-      'supervisorId': supervisor,
-    });
+    try {
+      // Generate a document ID based on bilkentId to ensure consistency
+      String docId = 'user_$bilkentId';
+
+      // Use doc() and set() instead of add() to specify the document ID
+      await _firestore.collection('User').doc(docId).set({
+        'name': name,
+        'email': email,
+        'bilkentId': bilkentId,
+        'role': role,
+        'supervisorId': supervisor,
+        'createdAt': FieldValue.serverTimestamp(), // Add timestamp for tracking
+      });
+
+      debugPrint('User added successfully with ID: $docId');
+    } catch (e) {
+      debugPrint('Error adding user to Firestore: $e');
+      throw Exception('Failed to add user: $e');
+    }
   }
 
   /// Belirtilen bilkentId'ye sahip kullanıcıyı getirir.
@@ -151,6 +162,67 @@ class DBHelper {
           .toList();
     }
     throw Exception('Failed to fetch student info');
+  }
+
+  /// Get all supervisors (Admin users) from Firebase
+  static Future<List<Map<String, dynamic>>> getAllSupervisors() async {
+    try {
+      final snapshot =
+          await _firestore
+              .collection('User')
+              .where('role', isEqualTo: 'Admin')
+              .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs
+            .map(
+              (doc) => {
+                'id': doc.id,
+                'bilkentId': doc.data()['bilkentId']?.toString() ?? '',
+                'name': doc.data()['name']?.toString() ?? 'Unknown',
+                'email': doc.data()['email']?.toString() ?? '',
+                ...doc.data() as Map<String, dynamic>,
+              },
+            )
+            .toList();
+      }
+      debugPrint("No supervisors found in Firebase");
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching supervisors from Firebase: $e");
+      return [];
+    }
+  }
+
+  /// Get students by supervisor ID
+  static Future<List<Map<String, dynamic>>> getStudentsBySupervisor(
+    String supervisorId,
+  ) async {
+    try {
+      final snapshot =
+          await _firestore
+              .collection('User')
+              .where('role', isEqualTo: 'Student')
+              .where('supervisorId', isEqualTo: supervisorId)
+              .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs
+            .map(
+              (doc) => {
+                'id': doc.id,
+                'bilkentId': doc.data()['bilkentId']?.toString() ?? '',
+                'name': doc.data()['name']?.toString() ?? 'Unknown',
+                ...doc.data() as Map<String, dynamic>,
+              },
+            )
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching students by supervisor: $e");
+      return [];
+    }
   }
 
   // --- Course İşlemleri ---
@@ -662,35 +734,37 @@ class DBHelper {
     if (assignments.isEmpty) {
       if (assignmentName == "Company Evaluation") {
         // Create new assignment document for Company Evaluation if it doesn't exist.
-        DocumentReference newAssignment = _firestore.collection('Assignment').doc();
+        DocumentReference newAssignment =
+            _firestore.collection('Assignment').doc();
         await newAssignment.set({
           'courseId': courseId,
           'name': assignmentName,
           'deadline': Timestamp.now(), // default deadline
-          'courseCode': courseId,      // fallback value
+          'courseCode': courseId, // fallback value
           'id': newAssignment.id,
         });
         assignment = {'id': newAssignment.id};
       } else {
-        throw Exception('Assignment not found for name: $assignmentName and courseId: $courseId');
+        throw Exception(
+          'Assignment not found for name: $assignmentName and courseId: $courseId',
+        );
       }
     } else {
       assignment = assignments.first;
     }
-    
+
     // Look for an existing Grade document for this student and assignment.
-    final gradeSnapshot = await _firestore
-        .collection('Grade')
-        .where('bilkentId', isEqualTo: bilkentId)
-        .where('courseId', isEqualTo: courseId)
-        .where('assignmentId', isEqualTo: assignment['id'])
-        .limit(1)
-        .get();
-    
+    final gradeSnapshot =
+        await _firestore
+            .collection('Grade')
+            .where('bilkentId', isEqualTo: bilkentId)
+            .where('courseId', isEqualTo: courseId)
+            .where('assignmentId', isEqualTo: assignment['id'])
+            .limit(1)
+            .get();
+
     if (gradeSnapshot.docs.isNotEmpty) {
-      await gradeSnapshot.docs.first.reference.update({
-        'grade': grade,
-      });
+      await gradeSnapshot.docs.first.reference.update({'grade': grade});
     } else {
       await _firestore.collection('Grade').add({
         'bilkentId': bilkentId,
@@ -773,13 +847,50 @@ class DBHelper {
 
   static Future<List<Map<String, dynamic>>>
   getStudentCoursesWithCourseInfo() async {
+    debugPrint("Starting getStudentCoursesWithCourseInfo()");
     final studentCoursesSnapshot =
         await _firestore.collection('StudentCourses').get();
     List<Map<String, dynamic>> studentCoursesWithCourseInfo = [];
 
+    debugPrint(
+      "Found ${studentCoursesSnapshot.docs.length} student course registrations",
+    );
+
     for (var doc in studentCoursesSnapshot.docs) {
       final studentCourseData = doc.data();
       final courseId = studentCourseData['courseId'];
+
+      debugPrint(
+        "Processing student course: ${studentCourseData['name']} with courseId: $courseId",
+      );
+
+      // Try to get course directly by ID first if courseId matches document ID
+      try {
+        final directCourseSnapshot =
+            await _firestore.collection('Course').doc(courseId).get();
+
+        if (directCourseSnapshot.exists) {
+          debugPrint("Found course directly by document ID");
+          final courseData = directCourseSnapshot.data()!;
+          studentCoursesWithCourseInfo.add({
+            'name': studentCourseData['name'],
+            'bilkentId': studentCourseData['bilkentId'],
+            'email': studentCourseData['email'] ?? '',
+            'companyEvaluationUploaded':
+                studentCourseData['companyEvaluationUploaded'] ?? false,
+            'course': {
+              'code': courseData['code'] ?? '',
+              'courseId': courseId,
+              'isActive': courseData['isActive'] ?? true,
+              'semester': courseData['semester'] ?? '',
+              'year': courseData['year'] ?? '',
+            },
+          });
+          continue; // Skip the query below
+        }
+      } catch (e) {
+        debugPrint("Error getting course directly: $e");
+      }
 
       final courseSnapshot =
           await _firestore
@@ -789,12 +900,14 @@ class DBHelper {
               .get();
 
       if (courseSnapshot.docs.isNotEmpty) {
+        debugPrint("Found course by courseId field");
         final courseData = courseSnapshot.docs.first.data();
         studentCoursesWithCourseInfo.add({
           'name': studentCourseData['name'],
           'bilkentId': studentCourseData['bilkentId'],
+          'email': studentCourseData['email'] ?? '',
           'companyEvaluationUploaded':
-              studentCourseData['companyEvaluationUploaded'],
+              studentCourseData['companyEvaluationUploaded'] ?? false,
           'course': {
             'code': courseData['code'],
             'courseId': courseData['courseId'],
@@ -803,9 +916,24 @@ class DBHelper {
             'year': courseData['year'],
           },
         });
+      } else {
+        debugPrint("❌ No course found for courseId: $courseId");
+
+        // Get all courses for debugging
+        final allCourses = await _firestore.collection('Course').get();
+        debugPrint("All courses (${allCourses.docs.length}):");
+        for (var courseDoc in allCourses.docs) {
+          final data = courseDoc.data();
+          debugPrint(
+            "Course: id=${courseDoc.id}, courseId=${data['courseId']}, code=${data['code']}",
+          );
+        }
       }
     }
 
+    debugPrint(
+      "Returning ${studentCoursesWithCourseInfo.length} student courses with info",
+    );
     return studentCoursesWithCourseInfo;
   }
 

@@ -119,6 +119,18 @@ class HomePageModel extends ChangeNotifier {
       debugPrint("Error loading data from local DB: $e");
     }
   }
+
+  // Load supervisors from Firebase
+  Future<void> loadSupervisors() async {
+    try {
+      final supervisors = await DBHelper.getAllSupervisors();
+      _supervisors = supervisors;
+      notifyListeners();
+      debugPrint("Loaded ${supervisors.length} supervisors from Firebase");
+    } catch (e) {
+      debugPrint("Error loading supervisors from Firebase: $e");
+    }
+  }
 }
 
 class AppStyles {
@@ -128,14 +140,14 @@ class AppStyles {
   static const borderRadius = 16.0;
   static const padding = EdgeInsets.all(16.0);
   static const fieldSpacing = SizedBox(height: 16);
-  
+
   // Helper method to get color based on theme
   static Color getButtonColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.dark 
-        ? Colors.lightBlue 
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.lightBlue
         : Colors.blue;
   }
-  
+
   static Color getPrimaryColor(BuildContext context) {
     return Colors.orange;
   }
@@ -218,7 +230,16 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bilkentIdController = TextEditingController();
 
-  final List<String> _years = ['2023', '2024', '2025'];
+  final List<String> _years = [
+    '2023',
+    '2024',
+    '2025',
+    '2026',
+    '2027',
+    '2028',
+    '2029',
+    '2030',
+  ];
   final List<String> _semesters = ['Fall', 'Spring'];
   final List<String> _courseList = ['CTIS310', 'CTIS290'];
   final List<String> _roles = ['Student', 'Admin'];
@@ -282,7 +303,7 @@ class _HomePageState extends State<HomePage> {
 
       String supervisorId;
       if (selectedRole == 'Admin') {
-        supervisorId = "0";
+        supervisorId = "0"; // Default for admin users
       } else {
         final selectedSupervisorName = homePageModel.selectedSupervisor;
         if (selectedSupervisorName == null) {
@@ -292,28 +313,17 @@ class _HomePageState extends State<HomePage> {
           return;
         }
 
-        // Find the supervisor ID
-        final supervisors = homePageModel.supervisors;
-        final selectedSupervisor = supervisors.firstWhere(
+        // Find supervisor from Firebase-loaded supervisors
+        final selectedSupervisor = homePageModel.supervisors.firstWhere(
           (supervisor) => supervisor['name'] == selectedSupervisorName,
-          orElse: () => {'id': '', 'name': ''},
+          orElse: () => {'bilkentId': '', 'name': ''},
         );
-        supervisorId = selectedSupervisor['id'] as String;
+
+        supervisorId = selectedSupervisor['bilkentId'] as String;
+        debugPrint("Selected supervisor ID: $supervisorId");
       }
 
-      // Create user map for local DB
-      final user = {
-        'bilkentId': _bilkentIdController.text,
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'role': selectedRole,
-        'supervisorId': supervisorId,
-      };
-
-      // Add to local DB
-      await LocalDBHelper.instance.createUser(user);
-
-      // Add to Firebase
+      // Add to Firebase only (skip LocalDB)
       await DBHelper.addUser(
         _nameController.text,
         _emailController.text,
@@ -333,14 +343,16 @@ class _HomePageState extends State<HomePage> {
         email: _emailController.text,
       );
 
-      // Reload data from local DB
-      await homePageModel.loadDataFromLocalDB();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('User added and password reset email sent'),
         ),
       );
+
+      // Clear form fields after successful addition
+      _nameController.clear();
+      _emailController.clear();
+      _bilkentIdController.clear();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -357,6 +369,10 @@ class _HomePageState extends State<HomePage> {
     _deadline310 = DBHelper.getActiveCourseAssignments("310");
     _deadline290 = DBHelper.getActiveCourseAssignments("290");
     _loadData();
+
+    // Load supervisors from Firebase
+    final homePageModel = Provider.of<HomePageModel>(context, listen: false);
+    homePageModel.loadSupervisors();
   }
 
   Future<void> _loadData() async {
@@ -386,7 +402,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('CTIS IMS'),
@@ -398,18 +414,21 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => DashboardPage(
-                    registeredSemesters: _registeredSemesters
-                        .map(
-                          (item) => Map<String, String>.fromEntries(
-                            item.entries.map(
-                              (e) => MapEntry(e.key, e.value.toString()),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    userData: widget.userData,
-                  ),
+                  builder:
+                      (context) => DashboardPage(
+                        registeredSemesters:
+                            _registeredSemesters
+                                .map(
+                                  (item) => Map<String, String>.fromEntries(
+                                    item.entries.map(
+                                      (e) =>
+                                          MapEntry(e.key, e.value.toString()),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                        userData: widget.userData,
+                      ),
                 ),
               );
             },
@@ -443,9 +462,7 @@ class _HomePageState extends State<HomePage> {
               await FirebaseAuth.instance.signOut();
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const LoginPage(),
-                ),
+                MaterialPageRoute(builder: (context) => const LoginPage()),
               );
             },
             child: const Text(
@@ -594,7 +611,7 @@ class _HomePageState extends State<HomePage> {
     final homePageModel = Provider.of<HomePageModel>(context, listen: false);
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.isDarkMode;
-    
+
     await showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -863,9 +880,15 @@ class _HomePageState extends State<HomePage> {
     // Course year options
     final List<String> _courseYears = [
       "2020-2021",
+      "2021-2022",
       "2022-2023",
       "2023-2024",
       "2024-2025",
+      "2025-2026",
+      "2026-2027",
+      "2027-2028",
+      "2028-2029",
+      "2029-2030",
     ];
     final List<String> _courseSemesters = ["Fall", "Spring"];
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -1107,24 +1130,36 @@ class _HomePageState extends State<HomePage> {
               AppStyles.fieldSpacing,
               // Only show supervisor dropdown when role is Student
               if (homePageModel.selectedRole == 'Student')
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: homePageModel.selectedSupervisor,
-                  decoration: const InputDecoration(
-                    labelText: 'Supervisor',
-                    border: OutlineInputBorder(),
-                  ),
-                  items:
-                      homePageModel.supervisors
-                          .map(
-                            (supervisor) => DropdownMenuItem(
-                              value: supervisor['name'] as String,
-                              child: Text(supervisor['name'] as String),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    homePageModel.updateSupervisor(value);
+                FutureBuilder<void>(
+                  future:
+                      homePageModel.supervisors.isEmpty
+                          ? homePageModel.loadSupervisors()
+                          : null,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: homePageModel.selectedSupervisor,
+                      decoration: const InputDecoration(
+                        labelText: 'Supervisor',
+                        border: OutlineInputBorder(),
+                      ),
+                      items:
+                          homePageModel.supervisors
+                              .map(
+                                (supervisor) => DropdownMenuItem(
+                                  value: supervisor['name'] as String,
+                                  child: Text(supervisor['name'] as String),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) {
+                        homePageModel.updateSupervisor(value);
+                      },
+                    );
                   },
                 ),
               if (homePageModel.selectedRole == 'Student')

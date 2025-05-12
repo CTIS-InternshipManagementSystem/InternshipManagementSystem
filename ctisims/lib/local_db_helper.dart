@@ -138,6 +138,17 @@ CREATE TABLE StudentCourse (
     );
   }
 
+  // Get students by supervisor ID
+  Future<List<Map<String, dynamic>>> getStudentsBySupervisor(String supervisorId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> students = await db.query(
+      'users',
+      where: 'role = ? AND supervisorId = ?',
+      whereArgs: ['Student', supervisorId],
+    );
+    return students;
+  }
+
   // CRUD operations for supervisors
   Future<List<Map<String, dynamic>>> getSupervisors() async {
     final db = await instance.database;
